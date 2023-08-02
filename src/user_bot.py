@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 from aiogram import types, executor, Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
@@ -135,4 +133,3 @@ async def load_location(message: types.Message, state: FSMContext) -> None:
 if __name__ == "__main__":
     executor.start_polling(dp,
                            skip_updates=True)
->>>>>>> Stashed changes
