@@ -54,3 +54,4 @@ async def edit_profile(state, user_id):
             set__name=data["name"],
             set__location=data["location"],
         )
+
