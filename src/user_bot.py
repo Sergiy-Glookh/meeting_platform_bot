@@ -119,10 +119,10 @@ async def load_location(message: types.Message, state: FSMContext) -> None:
         latitude = message.location.latitude
         longitude = message.location.longitude
 
-        location = geolocator.reverse((latitude, longitude))
-        print(location)
-        # print(location.raw["city"])
-        city = location.raw["address"]["city"]
+        # location = geolocator.reverse((latitude, longitude))
+        # print(location)
+        # # print(location.raw["city"])
+        city = "address"
 
         data["location"] = city
         await bot.send_photo(chat_id=message.from_user.id,

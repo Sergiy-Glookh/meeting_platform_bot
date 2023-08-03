@@ -1,2 +1,2 @@
-def a(a):
+def a(b):
     pass
