@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 from aiogram import types, executor, Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
@@ -8,7 +6,11 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from mongoengine import *
 from db.models import create_profile, edit_profile
 from geopy.geocoders import Nominatim
-from config import TOKEN_API, DB
+from dotenv import dotenv_values
+
+config = dotenv_values(".env")  # config = {"USER": "foo", "EMAIL": "foo@example.org"}
+DB = config.get("DB")
+TOKEN_API = config.get("TOKEN_API")
 
 connect(db='mongo_test', host=DB)
 
@@ -135,4 +137,4 @@ async def load_location(message: types.Message, state: FSMContext) -> None:
 if __name__ == "__main__":
     executor.start_polling(dp,
                            skip_updates=True)
->>>>>>> Stashed changes
+

@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 from mongoengine import *
 from datetime import datetime
 import json
@@ -56,4 +54,4 @@ async def edit_profile(state, user_id):
             set__name=data["name"],
             set__location=data["location"],
         )
->>>>>>> Stashed changes
+
