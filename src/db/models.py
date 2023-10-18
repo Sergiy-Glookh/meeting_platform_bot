@@ -3,6 +3,32 @@ from datetime import datetime
 import json
 
 
+class UserState:
+
+    def __init__(self):
+        self.regions = []
+        self.index = 0
+        self.select_city = {}
+        self.matched_cities = []
+        self.status = None
+
+    def __str__(self):
+        return f"UserState\n{self.regions}\n{self.index}\n{self.select_city}\n{self.matched_cities}\nEnd\n"
+
+
+class City(Document):
+    region = StringField(unique=True, required=True)
+    cities = ListField()
+
+    def json(self):
+        user_dict = {
+            "region": self.region,
+            "cities": self.cities,
+        }
+
+        return json.dumps(user_dict)
+
+
 class User(Document):
     user_id = IntField(primary_key=True)
     username = StringField(unique=True, required=True)
@@ -48,10 +74,24 @@ async def create_profile(message):
 async def edit_profile(state, user_id):
     async with state.proxy() as data:
         User.objects(user_id=user_id).update(
-            set__photo=data["photo"],
             set__age=data["age"],
             set__description=data["description"],
             set__name=data["name"],
-            set__location=data["location"],
         )
 
+
+async def add_location(location, user_id):
+    User.objects(user_id=user_id).update(
+        set__location=location,
+    )
+
+
+def get_regions_and_cities():
+    regions_and_cities = {}
+    try:
+        regions = City.objects()
+        for region in regions:
+            regions_and_cities[region.region] = region.cities
+    except DoesNotExist:
+        print("Regions not found")
+    return regions_and_cities
