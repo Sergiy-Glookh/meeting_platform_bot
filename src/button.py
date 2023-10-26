@@ -1,83 +1,74 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-def generate_years_keyboard():
-    years = [str(year) for year in range(2023, 2032)]  # Згенерувати список років
-    years_keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True, one_time_keyboard=True)
-    years_keyboard.add(*years)  # Додати роки до клавіатури
-    return years_keyboard
-
-def generate_back_button():
-    # Створіть кнопку "Назад"
-    back_button = KeyboardButton("Назад")
-    return ReplyKeyboardMarkup(resize_keyboard=True).add(back_button)
-
-button1 = KeyboardButton(text="Створити зустріч")
-button2 = KeyboardButton(text="Переглянути активні зустрічі")
-
-# Створення клавіатури з цими кнопками
-kb_client = ReplyKeyboardMarkup(keyboard=[[button1, button2]], resize_keyboard=True)
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InlineKeyboardButton
 
 
+def generate_towns_keyboard(info):
+    keyboard = []
 
-# Кількість кнопок в рядку для років
-years_per_row = 4
+    for item in info:
+        if ' (' in item:
+            town, region = item.split(' (')
+            region = region.rstrip(')')
+            region = f"{region}.обл"
+            button_text = f"{town} ({region})"
 
-year_keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True, row_width=years_per_row)
+            button = InlineKeyboardButton(text=button_text, callback_data=f'town_{town}')
+            keyboard.append([button])
 
-# Створюємо кнопки для клавіатури років
-year_buttons = [KeyboardButton(str(year)) for year in range(2023, 2043)]  # Змініть діапазон на потрібний
+    back_button = InlineKeyboardButton(text="Назад  ↩️️", callback_data="back")
+    keyboard.append([back_button])
 
-# Розбиваємо кнопки на рядки
-for row in range(0, len(year_buttons), years_per_row):
-    year_keyboard.row(*year_buttons[row:row + years_per_row])
-
-
-# Створення клавіатури для вибору місяця
-
-buttons_per_row = 4
-
-month_keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True, row_width=buttons_per_row)
-
-# Створюємо кнопки для клавіатури
-buttons = [KeyboardButton(str(i)) for i in range(1, 13)]
-
-# Розбиваємо кнопки на рядки
-for row in range(0, len(buttons), buttons_per_row):
-    month_keyboard.row(*buttons[row:row + buttons_per_row])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
-# Створення клавіатури для вибору дня
-days_per_row = 6
+def create_back_button():
+    return InlineKeyboardButton("Назад ↩️", callback_data="back")
 
-day_keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True, row_width=days_per_row)
 
-# Створюємо кнопки для клавіатури днів
-day_buttons = [KeyboardButton(str(day)) for day in range(1, 32)]
+#
+def create_keyboard_with_back():
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(create_back_button())
+    return keyboard
 
-# Розбиваємо кнопки на рядки
-for row in range(0, len(day_buttons), days_per_row):
-    day_keyboard.row(*day_buttons[row:row + days_per_row])
 
-# Створення клавіатури для вибору години
-# Кількість кнопок в рядку для годин
-hours_per_row = 4
+button1 = InlineKeyboardButton(text="Створити зустріч", callback_data="create_meeting")
+button2 = InlineKeyboardButton(text="Переглянути активні зустрічі", callback_data="view_meetings")
+button3 = InlineKeyboardButton(text="Переглянути завершені зустрічі", callback_data="view_end_meetings")
+kb_client = InlineKeyboardMarkup(inline_keyboard=[[button1], [button2], [button3]])
 
-hour_keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True, row_width=hours_per_row)
+# Створення інлайн клавіатури для вибору року
+year_buttons = [InlineKeyboardButton(str(year), callback_data=f"select_year:{year}") for year in range(2023, 2030)]
+year_buttons.append(create_back_button())
+year_keyboard = InlineKeyboardMarkup(row_width=3).add(*year_buttons)
 
-# Створюємо кнопки для клавіатури годин
-hour_buttons = [KeyboardButton(str(hour)) for hour in range(0, 24)]
+# Створення інлайн клавіатури для вибору місяця
+month_buttons = [InlineKeyboardButton(str(i), callback_data=f"select_month:{i}") for i in range(1, 13)]
+month_buttons.append(create_back_button())
+month_keyboard = InlineKeyboardMarkup().add(*month_buttons)
 
-# Розбиваємо кнопки на рядки
-for row in range(0, len(hour_buttons), hours_per_row):
-    hour_keyboard.row(*hour_buttons[row:row + hours_per_row])
-# Кількість кнопок в рядку для хвилин
-minutes_per_row = 4
+# Створення інлайн клавіатури для вибору дня
+day_buttons = [InlineKeyboardButton(str(day), callback_data=f"select_day:{day}") for day in range(1, 32)]
+day_buttons.append(create_back_button())
+day_keyboard = InlineKeyboardMarkup().add(*day_buttons)
 
-minute_keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True, row_width=minutes_per_row)
+# Створення інлайн клавіатури для вибору години
+hour_buttons = [InlineKeyboardButton(str(hour), callback_data=f"select_hour:{hour}") for hour in range(0, 24)]
+hour_buttons.append(create_back_button())
+hour_keyboard = InlineKeyboardMarkup().add(*hour_buttons)
 
-# Створюємо кнопки для клавіатури хвилин
-minute_buttons = [KeyboardButton(str(minute)) for minute in range(0, 60, 5)]  # Змініть крок на потрібний
+# Створення інлайн клавіатури для вибору хвилини
+minute_buttons = [InlineKeyboardButton(str(minute), callback_data=f"select_minute:{minute}") for minute in
+                  range(0, 60, 5)]
+minute_buttons.append(create_back_button())
+minute_keyboard = InlineKeyboardMarkup().add(*minute_buttons)
 
-# Розбиваємо кнопки на рядки
-for row in range(0, len(minute_buttons), minutes_per_row):
-    minute_keyboard.row(*minute_buttons[row:row + minutes_per_row])
+# Додавання кнопки "Назад" до головного меню
+kb_client_with_back = InlineKeyboardMarkup()
+kb_client_with_back.add(create_back_button())
 
+keyboard_with_back = InlineKeyboardMarkup(row_width=1)
+keyboard_with_back.add(InlineKeyboardButton("Назад ️️ ️️↩️", callback_data="back"))
+
+keyboard_back = InlineKeyboardMarkup().add(InlineKeyboardButton('Назад', callback_data='back_to_meeting_name'))
+keyboard_back_to_description = InlineKeyboardMarkup().add(
+    InlineKeyboardButton('Назад до опису', callback_data='back_to_description'))

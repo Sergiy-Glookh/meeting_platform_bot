@@ -1,272 +1,375 @@
-
-import datetime
+from datetime import datetime as dt
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher, types
-from button import *
 from connect import TOKEN, collection, GROUP_ID
 from api import get_info
-from gpt import main
+import datetime
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.types import CallbackQuery
+from aiogram.dispatcher import FSMContext
+from button import *
+
+waiting_for_street = State()
+previous_states = {}
+current_datetime = dt.now()
 storage = MemoryStorage()
-cities = {}
 bot = Bot(TOKEN)
 dp = Dispatcher(bot, storage=storage)
-from aiogram.dispatcher.filters.state import State, StatesGroup
+user_states = {}
+waiting_for_description = State()
 
-from aiogram.dispatcher import FSMContext
 
+@dp.callback_query_handler(lambda c: c.data == 'back',
+                           state=['waiting_for_month', 'waiting_for_day', 'waiting_for_hour', 'waiting_for_minute',
+                                  'waiting_for_year'])
+async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == 'waiting_for_minute':
+        await state.set_state('waiting_for_hour')
+        await bot.send_message(callback_query.message.chat.id, '🕛Виберіть годину:', reply_markup=hour_keyboard)
+    elif current_state == 'waiting_for_hour':
+        await state.set_state('waiting_for_day')
+        await bot.send_message(callback_query.message.chat.id, '🌝Виберіть день:', reply_markup=day_keyboard)
+    elif current_state == 'waiting_for_day':
+        await state.set_state('waiting_for_month')
+        await bot.send_message(callback_query.message.chat.id, '🌝Виберіть місяць:', reply_markup=month_keyboard)
+    elif current_state == 'waiting_for_month':
+        await state.set_state('waiting_for_year')
+        await bot.send_message(callback_query.message.chat.id, '🌍Виберіть рік:', reply_markup=year_keyboard)
+    elif current_state == 'waiting_for_year':
 
-class LocationForm(StatesGroup):
-    waiting_for_description = State()
-    waiting_for_town = State()
-    waiting_for_street = State()
-    waiting_for_selected_town = State()
-    waiting_for_selected_street = State()
-    waiting_for_year = State()
-    waiting_for_month = State()
-    waiting_for_day = State()
-    waiting_for_hour = State()
-    last_location = State()
+        user_id = callback_query.from_user.id
+        if user_id in previous_states:
+            previous_state = previous_states[user_id]
+            await state.set_state(previous_state['state'])
+            await state.update_data(previous_state['data'])
 
-def generate_towns_keyboard(info):
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-
-    for item in info:
-        if ' (' in item:
-            town, region = item.split(' (')
-            region = region.rstrip(')')
-            region = f"{region}.обл"
-            button_text = f"{town} ({region})"
-            keyboard.add(button_text)
-
-    return keyboard
+            await bot.send_message(callback_query.message.chat.id, previous_state['text'],
+                                   reply_markup=previous_state['keyboard'])
+        else:
+            await state.set_state('waiting_for_selected_town')
+            await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
+    else:
+        await state.set_state('waiting_for_selected_town')
+        await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
 
 
 @dp.message_handler(commands=['start'])
 async def start_def(message: types.Message):
     await message.answer('Привіт, що хочеш зробити?🤔', reply_markup=kb_client)
 
-# Обробник натискання на кнопку "Активні зустрічі"
-@dp.message_handler(text=['Переглянути активні зустрічі👀'])
-async def active_meetings(message: types.Message):
-    user_id = message.from_user.id
 
-    # Отримати активні зустрічі користувача з бази даних
+@dp.callback_query_handler(lambda c: c.data == 'view_meetings')
+async def view_active_meetings(callback_query: CallbackQuery):
+    user_id = callback_query.from_user.id
+
     active_meetings = collection.find({"user_id": user_id})
 
     if active_meetings:
         response = "🍻Ваші активні зустрічі:\n"
         for meeting in active_meetings:
-            response += f"🥂Зустріч у місті {meeting['city']}, Дата: {meeting['datetime']}\n"
+            city = meeting['city']
+            region = meeting['region']
+            datetime = meeting['datetime']
+            response += f"🥂Зустріч у місті {city}, {region} Дата: {datetime}\n"
     else:
         response = "😢Наразі у вас немає активних зустрічей."
 
-    await message.answer(response)
+    await bot.send_message(user_id, response)
 
 
+@dp.callback_query_handler(lambda c: c.data == 'create_meeting', state='*')
+async def start_create_meeting(callback_query: CallbackQuery, state: FSMContext):
+    current_state = await state.get_state()
+    user_id = callback_query.from_user.id
+    if user_id not in user_states:
+        user_states[user_id] = []
+    user_states[user_id].append(current_state)
+
+    keyboard_with_back = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️Назад', callback_data='back'))
+
+    await bot.send_message(callback_query.message.chat.id, '📝Вкажіть назву для Вашої зустрічі:',
+                           reply_markup=keyboard_with_back)
+    await state.set_state('waiting_for_meeting_name')
 
 
+@dp.message_handler(lambda message: len(message.text) >= 2, state='waiting_for_meeting_name')
+async def process_meeting_name_input(message: types.Message, state: FSMContext):
+    meeting_name = message.text
 
-# Обробник натискання на кнопку "Створити зустріч"
-@dp.message_handler(text=['Створити зустріч'])
-async def start_create_meeting(message: types.Message, state: FSMContext):
-    await message.answer('🗺️Введи назву населеного пункту де буде зустріч:')
-    await state.set_state('waiting_for_town')  # Встановлюємо стан для очікування назви населеного пункту
+    async with state.proxy() as data:
+        data['meeting_name'] = meeting_name
+
+    keyboard_back = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️Назад', callback_data='back_to_meeting_name'))
+
+    await message.answer('✅ Ви успішно ввели назву зустрічі. Тепер вкажіть опис зустрічі:', reply_markup=keyboard_back)
+    await state.set_state('waiting_for_description')
 
 
-# Обробник введення назви міста
+@dp.callback_query_handler(lambda c: c.data == 'back_to_meeting_name', state='waiting_for_description')
+async def process_back_button_to_meeting_name(callback_query: CallbackQuery, state: FSMContext):
+    await bot.send_message(callback_query.message.chat.id, '📝Вкажіть назву для Вашої зустрічі:',
+                           reply_markup=keyboard_with_back)
+    await state.set_state('waiting_for_meeting_name')
+
+
+@dp.callback_query_handler(lambda c: c.data == 'back', state=['waiting_for_meeting_name', 'waiting_for_description'])
+async def process_back_button_to_previous_state(callback_query: CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+    if user_id in previous_states:
+        previous_state = previous_states[user_id]
+        await bot.send_message(callback_query.message.chat.id, previous_state['text'],
+                               reply_markup=previous_state['keyboard'])
+        await state.set_state(previous_state['state'])
+
+        del previous_states[user_id]
+    else:
+        await bot.send_message(callback_query.message.chat.id, '🤔 Виберіть опцію:', reply_markup=kb_client)
+        await state.finish()
+
+
+@dp.message_handler(lambda message: len(message.text) >= 5, state='waiting_for_description')
+async def process_description_input(message: types.Message, state: FSMContext):
+    description = message.text
+
+    async with state.proxy() as data:
+        data['description'] = description
+
+        data['previous_message'] = message
+        data['previous_keyboard'] = message.reply_markup
+
+    keyboard_back = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️Назад', callback_data='back_to_description'))
+
+    await message.answer(
+        '✅ Ви успішно ввели опис зустрічі. Тепер вкажіть назву населеного пункту (міста), де буде зустріч:',
+        reply_markup=keyboard_back)
+    await state.set_state('waiting_for_town')
+
+
+@dp.callback_query_handler(lambda c: c.data == 'back_to_description', state='waiting_for_town')
+async def process_back_to_description_button(callback_query: CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        previous_message = data.get('previous_message')
+        previous_keyboard = data.get('previous_keyboard')
+        if previous_message:
+            await bot.send_message(callback_query.message.chat.id, previous_message.text,
+                                   reply_markup=previous_keyboard)
+
+    await state.set_state('waiting_for_description')
+
+
 @dp.message_handler(state='waiting_for_town')
 async def process_town_input(message: types.Message, state: FSMContext):
     selected_town = message.text
 
     async with state.proxy() as data:
         data['selected_town'] = selected_town
-        info = get_info(selected_town)  # Отримати інформацію про населені пункти
+        info = get_info(selected_town)
 
     if info:
         await state.update_data(info=info)
         towns_info = generate_towns_keyboard(info)
         await message.answer("🔍Виберіть населений пункт:", reply_markup=towns_info)
         await state.set_state('waiting_for_selected_town')
+
+        previous_states[message.from_user.id] = {
+            'state': 'waiting_for_selected_town',
+            'text': '🔍Виберіть населений пункт:',
+            'keyboard': towns_info,
+            'data': data,
+        }
     else:
         await message.answer("Назва населеного пункту некоректна😢. Введіть іншу назву:")
 
 
+@dp.callback_query_handler(lambda c: c.data == 'back',
+                           state=['waiting_for_selected_town', 'waiting_for_selected_street'])
+async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == 'waiting_for_selected_street':
+        await state.set_state('waiting_for_selected_town')
+    else:
+        await state.set_state('waiting_for_town')
 
-@dp.message_handler(lambda message: message.text, state='waiting_for_selected_town')
-async def cmd_choose_city(message: types.Message, state: FSMContext):
-    selected_city = message.text
-
-    async with state.proxy() as data:
-        selected_region = data.get('selected_region')
-
-    location_info = f'✅Ви обрали "{selected_city}""'
-
-    # Зберігаємо обраний населений пункт та місто у стані
-    async with state.proxy() as data:
-        data['selected_city'] = selected_city
-        data['selected_region'] = selected_region
-
-    # Тепер можна створити клавіатуру з вибором року і відправити користувачу
-    years_keyboard = generate_years_keyboard()  # Викликаємо функцію для створення клавіатури
-    await message.answer(f'{location_info}\n\n🌍Виберіть рік:', reply_markup=years_keyboard)
-    await state.set_state('waiting_for_year')
+    await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
 
 
+@dp.callback_query_handler(lambda c: c.data.startswith('town_'), state='waiting_for_selected_town')
+async def process_selected_town(callback_query: CallbackQuery, state: FSMContext):
+    selected_town = callback_query.data.split('_')[1]
+
+    await state.update_data(selected_city=selected_town)
+
+    town_info = get_info(selected_town)
+
+    if town_info:
+
+        city, region = town_info[0].split('(')
+
+        city = city.strip()
+        region = region.rstrip(')').strip()
+
+        await state.update_data(selected_region=region)
+
+        location_info = f'✅Ви обрали "{city}" ({region} обл.)'
+
+        years_keyboard = year_keyboard
+        await bot.send_message(callback_query.message.chat.id, f'{location_info}\n\n🌍Виберіть рік:',
+                               reply_markup=years_keyboard)
+        await state.set_state('waiting_for_year')
+    else:
+        await bot.send_message(callback_query.message.chat.id,
+                               "Не вдалося знайти інформацію про це місто. Спробуйте ще раз.")
 
 
+@dp.callback_query_handler(lambda c: c.data.startswith('select_year:'), state='waiting_for_year')
+async def process_year_input(callback_query: CallbackQuery, state: FSMContext):
+    selected_year = callback_query.data.split(':')[1]
+    selected_year = int(selected_year)
+
+    await bot.send_message(callback_query.message.chat.id, '🌝Виберіть місяць:', reply_markup=month_keyboard)
+    await state.update_data(year=selected_year)
+    await state.set_state('waiting_for_month')
 
 
-# Обробник вибору року
-@dp.message_handler(lambda message: message.text.isdigit(), state='waiting_for_year')
-async def process_year_input(message: types.Message, state: FSMContext):
-    selected_year = int(message.text)
-    await message.answer('🌙Виберіть місяць:', reply_markup=month_keyboard)
-    await state.update_data(year=selected_year)  # Зберігаємо обраний рік у стані
-    await state.set_state('waiting_for_month')  # Встановлюємо стан для очікування місяця
+@dp.callback_query_handler(lambda c: c.data.startswith('select_month:'), state='waiting_for_month')
+async def process_month_input(callback_query: CallbackQuery, state: FSMContext):
+    selected_month = callback_query.data.split(':')[1]
+    selected_month = int(selected_month)
 
-
-# Обробник вибору місяця
-@dp.message_handler(lambda message: message.text.isdigit(), state='waiting_for_month')
-async def process_month_input(message: types.Message, state: FSMContext):
-    selected_month = int(message.text)
-
-    # Отримайте поточну дату і час
     current_datetime = datetime.datetime.now()
 
-    # Отримайте дані зі стану
     async with state.proxy() as data:
         selected_year = data["year"]
 
-    # Перевірка, чи введений місяць є в майбутньому порівняно з поточним місяцем і роком
-    if (selected_year < current_datetime.year) or (selected_year == current_datetime.year and selected_month < current_datetime.month):
-        await message.answer("Ви не можете вибрати місяць в минулому. Виберіть інший місяць.")
+    if (selected_year < current_datetime.year) or (
+            selected_year == current_datetime.year and selected_month < current_datetime.month):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати місяць в минулому. Виберіть інший місяць.")
     else:
-        await message.answer('🌝Виберіть день:', reply_markup=day_keyboard)
-        await state.update_data(month=selected_month)  # Зберігаємо обраний місяць у стані
-        await state.set_state('waiting_for_day')  # Встановлюємо стан для очікування дня
+        await bot.send_message(callback_query.message.chat.id, '🌝Виберіть день:', reply_markup=day_keyboard)
+        await state.update_data(month=selected_month)
+        await state.set_state('waiting_for_day')
 
 
-# Обробник вибору дня
-@dp.message_handler(lambda message: message.text.isdigit(), state='waiting_for_day')
-async def process_day_input(message: types.Message, state: FSMContext):
-    selected_day = int(message.text)
+@dp.callback_query_handler(lambda c: c.data.startswith('select_day:'), state='waiting_for_day')
+async def process_day_input(callback_query: CallbackQuery, state: FSMContext):
+    selected_day = callback_query.data.split(':')[1]
+    selected_day = int(selected_day)
 
-    # Отримайте поточну дату і час
     current_datetime = datetime.datetime.now()
 
-    # Отримайте дані зі стану
     async with state.proxy() as data:
         selected_year = data["year"]
         selected_month = data["month"]
 
-    # Перевірка, чи введений день є в майбутньому порівняно з поточним роком, місяцем і днем
     if (selected_year < current_datetime.year) or \
-       (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day):
-        await message.answer("Ви не можете вибрати день в минулому. Виберіть інший день.")
+            (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати день в минулому. Виберіть інший день.")
     else:
-        await message.answer('🕛Виберіть годину:', reply_markup=hour_keyboard)
-        await state.update_data(day=selected_day)  # Зберігаємо обраний день у стані
-        await state.set_state('waiting_for_hour')  # Встановлюємо стан для очікування години
+        await bot.send_message(callback_query.message.chat.id, '🕛Виберіть годину:', reply_markup=hour_keyboard)
+        await state.update_data(day=selected_day)
+        await state.set_state('waiting_for_hour')
 
 
-# Обробник вибору години
-@dp.message_handler(lambda message: message.text.isdigit(), state='waiting_for_hour')
-async def process_hour_input(message: types.Message, state: FSMContext):
-    selected_hour = int(message.text)
+@dp.callback_query_handler(lambda c: c.data.startswith('select_hour:'), state='waiting_for_hour')
+async def process_hour_input(callback_query: CallbackQuery, state: FSMContext):
+    selected_hour = callback_query.data.split(':')[1]
+    selected_hour = int(selected_hour)
 
-    # Отримайте поточну дату і час
     current_datetime = datetime.datetime.now()
 
-    # Отримайте дані зі стану
     async with state.proxy() as data:
         selected_year = data["year"]
         selected_month = data["month"]
         selected_day = data["day"]
 
-    # Перевірка, чи введена година є в майбутньому порівняно з поточним часом
     if (selected_year < current_datetime.year) or \
-       (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour):
-        await message.answer("Ви не можете вибрати годину в минулому. Виберіть іншу годину.")
+            (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати годину в минулому. Виберіть іншу годину.")
     else:
-        await message.answer('⏱️Виберіть хвилину:', reply_markup=minute_keyboard)
-        await state.update_data(hour=selected_hour)  # Зберігаємо обрану годину у стані
-        await state.set_state('waiting_for_minute')  # Встановлюємо стан для очікування хвилини
+        await bot.send_message(callback_query.message.chat.id, '⏱️Виберіть хвилину:', reply_markup=minute_keyboard)
+        await state.update_data(hour=selected_hour)
+        await state.set_state('waiting_for_minute')
 
 
-# Обробник вибору хвилини
-@dp.message_handler(lambda message: message.text.isdigit(), state='waiting_for_minute')
-async def process_minute_input(message: types.Message, state: FSMContext):
-    selected_minute = int(message.text)
+@dp.callback_query_handler(lambda c: c.data.startswith('select_minute:'), state='waiting_for_minute')
+async def process_minute_input(callback_query: CallbackQuery, state: FSMContext):
+    selected_minute = callback_query.data.split(':')[1]
+    selected_minute = int(selected_minute)
 
-    # Отримайте поточну дату і час
     current_datetime = datetime.datetime.now()
 
-    # Отримайте дані зі стану
     async with state.proxy() as data:
         selected_year = data["year"]
         selected_month = data["month"]
         selected_day = data["day"]
         selected_hour = data["hour"]
 
-    # Перевірка, чи введена хвилина є в майбутньому порівняно з поточним часом
     if (selected_year < current_datetime.year) or \
-       (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour == current_datetime.hour and selected_minute < current_datetime.minute):
-        await message.answer("Ви не можете вибрати хвилину в минулому. Виберіть іншу хвилину.")
+            (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour == current_datetime.hour and selected_minute < current_datetime.minute):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати хвилину в минулому. Виберіть іншу хвилину.")
     else:
         async with state.proxy() as data:
-            user_id = message.from_user.id
+            user_id = callback_query.from_user.id
+            description = data["description"]
+            meeting_name = data["meeting_name"]
             selected_city = data["selected_city"]
             selected_year = data["year"]
             selected_month = data["month"]
             selected_day = data["day"]
             selected_hour = data["hour"]
+            selected_region = data["selected_region"]
 
-        # Збереження інформації про дату та час
         date_time = datetime.datetime(selected_year, selected_month, selected_day, selected_hour, selected_minute)
-        formatted_date_time = date_time.strftime('%Y-%m-%d о %H:%M годині')
+        formatted_date_time = date_time.strftime('%Y-%m-%d' ' о ' '%H:%M' ' годині')
 
-        # Збереження всієї інформації в базу даних
         user_data = {
+
             "user_id": user_id,
             "city": selected_city,
+            "region": f"{selected_region} обл.",
             "datetime": formatted_date_time,
-            "timestamp": datetime.datetime.now()
+            "timestamp": datetime.datetime.now(),
+            "meeting_name": meeting_name,
+            "description": description
         }
         collection.insert_one(user_data)
 
-        # Вивід інформації про зустріч
         response = (
-            f"✅Ваша зустріч відбудеться у місті {selected_city}, "
-            f" Дата: {formatted_date_time}"
+            f"✅Ваша зустріч {meeting_name} відбудеться у місті {selected_city}, {selected_region} обл. "
+            f"Дата: {formatted_date_time}"
         )
-        await message.answer(response)
+        await bot.send_message(callback_query.message.chat.id, response)
 
-        # Створення кнопки для додавання ідентифікатора користувача в базу даних
-        join_button = types.InlineKeyboardButton("✅Приєднатися", callback_data=user_id)
-        keyboard = types.InlineKeyboardMarkup()
+        join_button = InlineKeyboardButton("✅Приєднатися", callback_data=str(user_id))
+        keyboard = InlineKeyboardMarkup()
         keyboard.add(join_button)
 
-        # Опублікувати повідомлення у групі з кнопкою
-        post_message = f"Нова зустріч: {formatted_date_time} у {selected_city}"
+        post_message = f"Нова зустріч: {meeting_name} відбудеться {formatted_date_time} у місті {selected_city}, {selected_region} обл."
         await bot.send_message(GROUP_ID, post_message, reply_markup=keyboard)
 
         await state.finish()
-        await message.answer('Зустріч створено, вітаю🥳',
-                             reply_markup=kb_client)
-        await state.finish()
 
 
-# Обробник натискання на кнопку "Приєднатися"
 @dp.callback_query_handler(lambda callback_query: True)
 async def join_meeting(callback_query: types.CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
-
 
     doc = {
         "add_user": user_id
@@ -275,13 +378,7 @@ async def join_meeting(callback_query: types.CallbackQuery, state: FSMContext):
     await bot.answer_callback_query(callback_query.id, text="Ви приєднались до зустрічі!")
 
 
-
-async def on_startup(_):
-    print('Бот запущено')
-
-
-
 if __name__ == "__main__":
     from aiogram import executor
 
-    executor.start_polling(dp, on_startup=on_startup)
+    executor.start_polling(dp, skip_updates=True)
