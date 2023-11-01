@@ -7,6 +7,7 @@ from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import types, Bot, Dispatcher
 from aiogram.dispatcher import FSMContext
+from datetime import datetime
 
 from mongoengine import *
 from dotenv import dotenv_values
@@ -29,13 +30,16 @@ user_states = {}
 
 class ProfileStatesGroup(StatesGroup):
     name = State()
-    age = State()
     description = State()
+    birth_day = State()
+    birth_month = State()
+    birth_year = State()
 
 
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     user_id = message.from_user.id
+    print(message.from_user.username)
     user_states[user_id] = UserState()
     await create_profile(message.from_user)
     await message.reply("Будь ласка, введіть ваше ім'я:")
@@ -48,27 +52,82 @@ async def load_name(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data["name"] = message.text
 
-    await message.reply("Скільки тобі років?")
-    await ProfileStatesGroup.next()
+    await message.reply("Виберіть день вашого народження:", reply_markup=birth_day_keyboard())
+    await ProfileStatesGroup.birth_day.set()
+
+def birth_day_keyboard():
+    keyboard = InlineKeyboardMarkup(row_width=10)
+    days = list(range(1, 32))
+    for i in range(0, len(days), 10):
+        row = [InlineKeyboardButton(str(day), callback_data=f"day_{day}") for day in days[i:i + 10]]
+        keyboard.add(*row)
+    return keyboard
 
 
-@dp.message_handler(lambda message: not message.text.isdigit() or float(message.text) < 10 or float(message.text) > 80,
-                    state=ProfileStatesGroup.age)
-async def check_age(message: types.Message):
-    await message.reply("Введіть реальний вік!")
-
-
-@dp.message_handler(state=ProfileStatesGroup.age)
-async def load_age(message: types.Message, state: FSMContext) -> None:
+@dp.callback_query_handler(lambda query: query.data.startswith("day_"), state=ProfileStatesGroup.birth_day)
+async def select_birth_day(query: types.CallbackQuery, state: FSMContext):
+    day = int(query.data.split("_")[1])
     async with state.proxy() as data:
-        data["age"] = message.text
+        data["birth_day"] = day
 
-    await message.reply("А тепер розкажи трохи про себе!")
-    await ProfileStatesGroup.next()
+    await state.update_data(birth_day=day)
+
+    await query.message.edit_text(f"Обраний день народження: {day}. Виберіть місяць народження:",
+                                  reply_markup=birth_month_keyboard())
+    await ProfileStatesGroup.birth_month.set()
+
+
+def birth_month_keyboard():
+    keyboard = InlineKeyboardMarkup(row_width=4)
+    months = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"]
+    for i in range(0, len(months), 4):
+        row = [InlineKeyboardButton(months[j], callback_data=f"month_{j + 1}") for j in range(i, i + 4)]
+        keyboard.add(*row)
+    return keyboard
+
+@dp.callback_query_handler(lambda query: query.data.startswith("month_"), state=ProfileStatesGroup.birth_month)
+async def select_birth_month(query: types.CallbackQuery, state: FSMContext):
+    month = int(query.data.split("_")[1])
+    async with state.proxy() as data:
+        data["birth_month"] = month
+
+    await state.update_data(birth_month=month)
+
+    await query.message.edit_text(f"Обраний місяць народження: {month}. Тепер введіть рік народження:")
+    await ProfileStatesGroup.birth_year.set()
+
+
+@dp.callback_query_handler(lambda query: query.data.startswith("year_"), state=ProfileStatesGroup.birth_year)
+async def select_birth_year(query: types.CallbackQuery, state: FSMContext):
+    year = int(query.data.split("_")[1])
+    async with state.proxy() as data:
+        data["birth_year"] = year
+
+    await state.update_data(birth_year=year)
+    await state.update_data(birth_month=data["birth_month"])
+    await state.update_data(birth_day=data["birth_day"])
+
+    await query.message.edit_text(f"Обраний рік народження: {year}. Тепер введіть опис про себе:")
+    await ProfileStatesGroup.description.set()
+
+
+@dp.message_handler(state=ProfileStatesGroup.birth_year, content_types=types.ContentType.TEXT)
+async def load_birth_year(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["birth_year"] = message.text
+
+    current_year = datetime.now().year
+
+    if not data["birth_year"].isdigit() or int(data["birth_year"]) < (current_year - 80) or int(data["birth_year"]) > current_year:
+        await message.reply("Рік народження не є дійсним. Будь ласка, введіть свій реальний рік народження.")
+    else:
+        await state.update_data(birth_year=data["birth_year"])
+        await message.reply("Відмінно! Тепер розкажіть трохи про себе.")
+        await ProfileStatesGroup.description.set()
 
 
 @dp.message_handler(state=ProfileStatesGroup.description)
-async def load_description(message: types.Message, state: FSMContext) -> None:
+async def load_description(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data["description"] = message.text
 
@@ -323,11 +382,13 @@ async def finish_selection(query: types.CallbackQuery):
         if region in user_state.regions:
             locations[region] = user_state.select_city[region]
             selected_cities.extend(user_state.select_city[region])
+
     await add_location(locations, user_id=user_id)
     user = User.objects(user_id=user_id).first()
     if user:
-        user_info = f"{user.name}, {user.age}\n"
-        user_info += f"{user.description}\n"
+        user_info = f"Імʼя: {user.name}\n"
+        user_info += f"Дата народження: {user.birth_day}/{user.birth_month}/{user.birth_year}\n"
+        user_info += f"Про себе: {user.description}\n"
 
         selected_cities = ', '.join(selected_cities)
 
