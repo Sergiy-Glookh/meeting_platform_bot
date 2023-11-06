@@ -1,16 +1,26 @@
 from collections import Counter
+from dotenv import dotenv_values
+from datetime import datetime
 import requests
-from fuzzywuzzy import fuzz
-from db.models import create_profile, edit_profile, get_regions_and_cities, UserState, City, add_location, User
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import os
+import threading
+import time
+
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ContentType
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import types, Bot, Dispatcher
 from aiogram.dispatcher import FSMContext
-from datetime import datetime
-
 from mongoengine import *
-from dotenv import dotenv_values
+from fuzzywuzzy import fuzz
+from pydub import AudioSegment
+import speech_recognition as sr
+import g4f
+from g4f.Provider import (
+    Bing,
+)
+from db.models import create_profile, edit_profile, get_regions_and_cities, UserState, City, add_location, User, \
+    add_interests
 
 config = dotenv_values("../.env")  # config = {"USER": "foo", "EMAIL": "foo@example.org"}
 DB = config.get("DB")
@@ -20,11 +30,24 @@ CITIES_SEARCH_URL = config.get("CITIES_SEARCH_URL")
 
 connect(db='mongo_test', host=DB)
 
+recognizer = sr.Recognizer()
 storage = MemoryStorage()
 bot = Bot(TOKEN_API)
 dp = Dispatcher(bot, storage=storage)
 
 ALL_REGIONS_AND_CITIES = get_regions_and_cities()
+CATEGORIES = [
+    'Технології',
+    'Мистецтво та Культура',
+    'Спорт',
+    'Кулінарія',
+    'Наука та Дослідження',
+    'Спільноти та Благодійність',
+    'Мода та Краса',
+    'Музика',
+    'Подорожі',
+    'Бізнес та Підприємництво'
+]
 user_states = {}
 
 
@@ -127,17 +150,229 @@ async def load_birth_year(message: types.Message, state: FSMContext):
         await message.reply("Рік народження не є дійсним.\nБудь ласка, введіть свій реальний рік народження.")
     else:
         await state.update_data(birth_year=data["birth_year"])
-        await message.reply("Відмінно! Тепер розкажіть трохи про себе.")
-        await ProfileStatesGroup.description.set()
+        # await message.reply("Відмінно! Тепер розкажіть трохи про себе.")
+        await edit_profile(state, user_id=message.from_user.id)
+        await state.finish()
+        await select_interests(message)
 
 
-@dp.message_handler(state=ProfileStatesGroup.description)
-async def load_description(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data["description"] = message.text
+async def select_interests(message: types.Message):
+    user_id = message.from_user.id
+    user_state = user_states[user_id]
 
-    await edit_profile(state, user_id=message.from_user.id)
-    await state.finish()
+    print(user_state.selected_categories)
+    print(user_state.categories_list)
+    # if query.data == "select_categories_again":
+
+    await bot.send_message(chat_id=user_id, text="Розкажіть про себе, щоб визначити ваші інтереси:")
+    user_state.status = "waiting_for_interests"  # ставимо статус, що очікуємо відповідь від користувача
+
+
+@dp.callback_query_handler(lambda query: query.data == "select_categories_again")
+async def select_interests_again(query: types.CallbackQuery):
+    user_id = query.from_user.id
+    user_state = user_states[user_id]
+
+    print(user_state.selected_categories)
+    print(user_state.categories_list)
+    # if query.data == "select_categories_again":
+
+    await query.message.edit_text(text="Розкажіть про себе, щоб визначити ваші інтереси:")
+    user_state.status = "waiting_for_interests"  # ставимо статус, що очікуємо відповідь від користувача
+
+
+async def send_message_with_timing(provider, model, message_content, num_messages=1):
+    print(message_content)
+    print("-" * 30)
+    messages = [{"role": "user", "content": message_content}] * num_messages
+    print("messages")
+    print(messages)
+    print("-" * 30)
+    auth_data = "your_auth_data_here"  # Замість 'your_auth_data_here' вставте свої аутентифікаційні дані для Bard
+
+    try:
+        response = await g4f.ChatCompletion.create_async(
+            model=model,
+            provider=provider,
+            messages=messages,
+            auth=auth_data
+        )
+    except Exception as e:
+        print(f"Error with provider {provider.__name__}: {str(e)}")
+        print("Switching to the next provider...")
+        return
+
+    # if isinstance(response, str):
+    print("response")
+    print(response)
+
+    start_index = response.find("[")
+    if start_index == -1:
+        return None
+    end_index = response.find("]")
+    categories_str = response[start_index + 1:end_index]
+
+    categories_list = [category.strip("', ") for category in categories_str.split(",")]
+    return categories_list
+
+
+async def request_to_chat(user_text):
+    # providers = [
+    #     # Acytoo,  # Часто повертає помилку авторизації, але
+    #     # Aichat, #дуже швидка але має квоту на 10 запитів
+    #     # Ails, #15 free requests
+    #     Bing
+    # ]  # Виберіть бажані провайдери
+    model = g4f.models.gpt_4  # Використовуйте GPT-4
+    provider = Bing
+
+    print(f"Using provider: {provider.__name__}")
+    categories_list = await send_message_with_timing \
+        (provider, model,
+         f"Categories: {CATEGORIES}. Don't write code, print only the list of categories from my "
+         f"list without explanation, in python list format, to which the text will be: {user_text}."
+         f"Minimum number of categories: 1",
+         num_messages=3)
+
+    return categories_list
+
+
+def recognize_language(language, audio_data, results, index):
+    start_time = time.time()
+    text = recognizer.recognize_google(audio_data, language=language)
+    results[index] = text
+    end_time = time.time()
+    print(f"Execution time for index {index}: {end_time - start_time:.2f} seconds")
+
+
+async def recognize_audio(file_id):
+    print("recognize_audio")
+    file = await bot.get_file(file_id)
+    file_path = file.file_path
+    await bot.download_file(file_path, f"{file_id}.ogg")
+
+    audio = AudioSegment.from_file(f"{file_id}.ogg", format="ogg")
+    audio.export(f"{file_id}.wav", format="wav")
+
+    with sr.AudioFile(f"{file_id}.wav") as source:
+        audio_data = recognizer.record(source)
+        print(audio_data)
+
+    available_languages = ['uk-UA', 'ru-RU']
+    text_results = [None] * len(available_languages)
+
+    threads = []
+    for i, language in enumerate(available_languages):
+        thread = threading.Thread(target=recognize_language, args=(language, audio_data, text_results, i))
+        threads.append(thread)
+        thread.start()
+    for thread in threads:
+        thread.join()
+    print(threads)
+    print("UA Result:\n", text_results[0])
+    print("RU Result:\n", text_results[1])
+
+    os.remove(f"{file_id}.wav")
+    os.remove(f"{file_id}.ogg")
+
+    text = text_results[0] if len(text_results[0]) > len(text_results[1]) else text_results[1]
+    return text
+
+
+@dp.message_handler(content_types=[ContentType.VOICE])
+async def voice_message_handler(message: types.Message):
+    user_id = message.from_user.id
+    user_state = user_states[user_id]
+    if user_state.status != "waiting_for_interests":
+        return
+
+    user_state.status = None
+
+    file_id = message.voice.file_id
+    text = await recognize_audio(file_id)
+
+    await process_text(user_state, message, text)
+
+
+@dp.message_handler(lambda message: message.text)
+async def interest_response_analysis(message: types.Message):
+    user_id = message.from_user.id
+    user_state = user_states[user_id]
+    if user_state.status != "waiting_for_interests":
+        return
+
+    user_state.status = None
+
+    text = message.text
+    await process_text(user_state, message, text)
+
+
+async def process_text(user_state, message, text):
+    print(text)
+    categories_list = []
+    await message.reply("Зачекайте 2-3 хвилини, ваша відповідь оброблюється")
+    for _ in range(3):
+        categories_list = await request_to_chat(text)
+        print(categories_list)
+
+        if categories_list and all(item in CATEGORIES for item in categories_list):
+
+            for category in categories_list:
+                if category not in user_state.categories_list:
+                    user_state.categories_list.append(category)
+
+            keyboard = InlineKeyboardMarkup()
+            for category in user_state.categories_list:
+                if category in user_state.selected_categories:
+                    keyboard.add(InlineKeyboardButton(f"✅ {category}", callback_data=category))
+                else:
+                    keyboard.add(InlineKeyboardButton(category, callback_data=category))
+            keyboard.add(InlineKeyboardButton("🔸 Спробувати ще раз", callback_data="select_categories_again"))
+
+            await message.reply(f"Оберіть категорію/категорії:", reply_markup=keyboard)
+            break
+
+    if not categories_list:
+        await message.reply("На жаль, ми не можемо розпізнати категорії за наданим текстом. Будь ласка, спробуйте ще "
+                            "раз.")
+        await select_interests(message)
+
+
+@dp.callback_query_handler(lambda query: query.data in CATEGORIES)
+async def select_categories(query: types.CallbackQuery):
+    print("select_categories")
+    user_id = query.from_user.id
+    user_state = user_states[user_id]
+
+    category = query.data  # категорія, яку обрав користувач
+
+    if category in user_state.selected_categories:
+        user_state.selected_categories.remove(category)
+    else:
+        user_state.selected_categories.append(category)
+
+    keyboard = InlineKeyboardMarkup()
+    for category in user_state.categories_list:
+        if category in user_state.selected_categories:
+            keyboard.add(InlineKeyboardButton(f"✅ {category}", callback_data=category))
+        else:
+            keyboard.add(InlineKeyboardButton(category, callback_data=category))
+
+    keyboard.add(InlineKeyboardButton("🔸 Спробувати ще раз", callback_data="select_categories_again"))
+
+    if user_state.selected_categories:
+        keyboard.add(InlineKeyboardButton("😺 Готово!", callback_data="end_selected_categories"))
+
+    await query.message.edit_text(text="Оберіть категорію/категорії:", reply_markup=keyboard)
+
+
+@dp.callback_query_handler(lambda query: query.data == "end_selected_categories")
+async def load_description(query: types.CallbackQuery):
+    user_id = query.from_user.id
+    user_state = user_states[user_id]
+
+    await add_interests(user_state.selected_categories, user_id=user_id)
+    await query.message.edit_text(text=f"Обрані категорії: {', '.join(user_state.selected_categories)}")
 
     keyboard = InlineKeyboardMarkup()
     for region in ALL_REGIONS_AND_CITIES:
@@ -145,7 +380,7 @@ async def load_description(message: types.Message, state: FSMContext):
 
     keyboard.add(InlineKeyboardButton("🔸 Моєї області немає", callback_data="unfounded_city"))
 
-    await message.reply(f"Оберіть область/області:", reply_markup=keyboard)
+    await bot.send_message(user_id, f"Оберіть область/області:", reply_markup=keyboard)
 
 
 @dp.callback_query_handler(
@@ -259,7 +494,8 @@ def generate_selection_keyboard(selected_index, selected_regions, selected_citie
 
         if is_last_region:
             if selected_cities:
-                keyboard.row(prev_region_button, InlineKeyboardButton("😺 Готово!", callback_data="done_selected_cities"))
+                keyboard.row(prev_region_button,
+                             InlineKeyboardButton("😺 Готово!", callback_data="done_selected_cities"))
             else:
                 keyboard.add(prev_region_button)
         elif selected_index == 0:
@@ -399,7 +635,6 @@ async def finish_selection_cities(query: types.CallbackQuery):
 
     else:
         await query.message.edit_text(text="Користувача не знайдено в базі даних.")
-
 
 
 if __name__ == '__main__':
