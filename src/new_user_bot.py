@@ -1,3 +1,4 @@
+import re
 from collections import Counter
 from dotenv import dotenv_values
 from datetime import datetime
@@ -28,7 +29,7 @@ TOKEN_API = config.get("TOKEN_API")
 NOVA_POSHTA_API_KEY = config.get("NOVA_POSHTA_API_KEY")
 CITIES_SEARCH_URL = config.get("CITIES_SEARCH_URL")
 
-connect(db='mongo_test', host=DB)
+connect(db='meeting-bot', host=DB)
 
 recognizer = sr.Recognizer()
 storage = MemoryStorage()
@@ -151,6 +152,7 @@ async def load_birth_year(message: types.Message, state: FSMContext):
     else:
         await state.update_data(birth_year=data["birth_year"])
         # await message.reply("Відмінно! Тепер розкажіть трохи про себе.")
+
         await edit_profile(state, user_id=message.from_user.id)
         await state.finish()
         await select_interests(message)
@@ -206,9 +208,12 @@ async def send_message_with_timing(provider, model, message_content, num_message
     print("response")
     print(response)
 
+    matches = re.findall("\[[^\d]+\]", response)
+    print(matches)
     start_index = response.find("[")
     if start_index == -1:
         return None
+
     end_index = response.find("]")
     categories_str = response[start_index + 1:end_index]
 
@@ -331,7 +336,8 @@ async def process_text(user_state, message, text):
 
             await message.reply(f"Оберіть категорію/категорії:", reply_markup=keyboard)
             break
-
+        else:
+            continue
     if not categories_list:
         await message.reply("На жаль, ми не можемо розпізнати категорії за наданим текстом. Будь ласка, спробуйте ще "
                             "раз.")
@@ -417,6 +423,7 @@ async def select_region(query: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda query: query.data == "unfounded_city")
 async def unfounded_city(query: types.CallbackQuery):
+    print(unfounded_city)
     user_id = query.from_user.id
     message_id = query.message.message_id
     keyboard = InlineKeyboardMarkup()
@@ -425,11 +432,14 @@ async def unfounded_city(query: types.CallbackQuery):
     await bot.edit_message_text("Введіть назву міста:", chat_id=user_id, message_id=message_id, reply_markup=keyboard)
 
     user_state = user_states[user_id]
+    print(user_state)
     user_state.status = "waiting_for_city"
+    print(user_state)
 
 
 @dp.message_handler(lambda message: user_states[message.from_user.id].status == "waiting_for_city")
 async def input_unfounded_city_name(message: types.Message):
+    print(input_unfounded_city_name)
     user_id = message.from_user.id
     user_state = user_states[user_id]
 
@@ -627,10 +637,12 @@ async def finish_selection_cities(query: types.CallbackQuery):
     user = User.objects(user_id=user_id).first()
     if user:
         user_info = f"{user.name}\n"
-
+        # user_info += f"День народження: {user.birth_day}/{user.birth_month}/{user.birth_year}\n"
+        user_interests = ', '.join(user.interests)
+        user_info += f"Інтереси: {user_interests}\n"
         selected_cities = ', '.join(selected_cities)
 
-        message_text = f"{user_info}{selected_cities}"
+        message_text = f"{user_info}Обрані міста: {selected_cities}"
         await query.message.edit_text(text=message_text)
 
     else:

@@ -1,5 +1,5 @@
 from mongoengine import *
-from datetime import datetime
+from datetime import datetime, date
 import json
 
 
@@ -11,13 +11,13 @@ class UserState:
         self.selected_cites = {}
         self.matched_cities = []
 
-        # self.birth_day = None
-        # self.birth_month = None
-        # self.birth_year = None
-
         self.categories_list = []  # список категорій, які для користувача визначив чат-бот
         self.selected_categories = []  # категорії, які обрав користувач
         self.status = None  # статус для очікування відповіді
+
+    def __str__(self):
+        return f"{self.selected_regions}\n{self.index_page}\n{self.selected_cites}\n{self.matched_cities}\n\n" \
+               f"{self.categories_list}\n{self.selected_categories}\n{self.status}"
 
 
 class City(Document):
@@ -41,10 +41,8 @@ class User(Document):
     description = StringField(max_length=500)
     location = ListField()
     interests = ListField()
+    birthday = DateTimeField()
     date_created = DateTimeField(default=datetime.utcnow())
-    birth_day = IntField()
-    birth_month = IntField()
-    birth_year = IntField()
 
     def json(self):
         user_dict = {
@@ -53,9 +51,7 @@ class User(Document):
             "description": self.description,
             "location": self.location,
             "interests": self.interests,
-            "birth_day": self.birth_day,
-            "birth_month": self.birth_month,
-            "birth_year": self.birth_year,
+            "birthday": self.birthday,
         }
 
         return json.dumps(user_dict)
@@ -87,11 +83,10 @@ async def create_profile(message):
 
 async def edit_profile(state, user_id):
     async with state.proxy() as data:
+        data_birthday = date(int(data["birth_year"]), int(data["birth_month"]), int(data["birth_day"]))
         User.objects(user_id=user_id).update(
             set__name=data["name"],
-            set__birth_day=data["birth_day"],
-            set__birth_month=data["birth_month"],
-            set__birth_year=data["birth_year"],
+            set__birthday=data_birthday,
         )
 
 
