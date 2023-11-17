@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-
-=======
 from dotenv import dotenv_values
 
 
@@ -37,4 +34,3 @@ CATEGORIES = [
     'Подорожі',
     'Бізнес та Підприємництво'
 ]
->>>>>>> juli
