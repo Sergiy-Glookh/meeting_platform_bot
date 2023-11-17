@@ -287,7 +287,7 @@ async def voice_message_handler(message: types.Message):
     await process_text(user_state, message, text)
 
 
-@dp.message_handler(lambda message: message.text)
+@dp.message_handler(lambda message: user_states[message.from_user.id].status == "waiting_for_interests")
 async def interest_response_analysis(message: types.Message):
     user_id = message.from_user.id
     user_state = user_states[user_id]
