@@ -1,6 +1,5 @@
 import re
 from collections import Counter
-from dotenv import dotenv_values
 from datetime import datetime
 import requests
 import os
@@ -9,10 +8,8 @@ import time
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ContentType
 from aiogram.dispatcher.filters.state import StatesGroup, State
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram import types, Bot, Dispatcher
+from aiogram import types
 from aiogram.dispatcher import FSMContext
-from mongoengine import *
 from fuzzywuzzy import fuzz
 from pydub import AudioSegment
 import speech_recognition as sr
@@ -20,35 +17,11 @@ import g4f
 from g4f.Provider import (
     Bing,
 )
+
 from db.models import create_profile, edit_profile, get_regions_and_cities, UserState, City, add_location, User, \
     add_interests
+from db.connect import recognizer, bot, dp, ALL_REGIONS_AND_CITIES, CATEGORIES, NOVA_POSHTA_API_KEY, CITIES_SEARCH_URL
 
-config = dotenv_values("../.env")  # config = {"USER": "foo", "EMAIL": "foo@example.org"}
-DB = config.get("DB")
-TOKEN_API = config.get("TOKEN_API")
-NOVA_POSHTA_API_KEY = config.get("NOVA_POSHTA_API_KEY")
-CITIES_SEARCH_URL = config.get("CITIES_SEARCH_URL")
-
-connect(db='meeting-bot', host=DB)
-
-recognizer = sr.Recognizer()
-storage = MemoryStorage()
-bot = Bot(TOKEN_API)
-dp = Dispatcher(bot, storage=storage)
-
-ALL_REGIONS_AND_CITIES = get_regions_and_cities()
-CATEGORIES = [
-    'Технології',
-    'Мистецтво та Культура',
-    'Спорт',
-    'Кулінарія',
-    'Наука та Дослідження',
-    'Спільноти та Благодійність',
-    'Мода та Краса',
-    'Музика',
-    'Подорожі',
-    'Бізнес та Підприємництво'
-]
 user_states = {}
 
 
@@ -208,16 +181,12 @@ async def send_message_with_timing(provider, model, message_content, num_message
     print("response")
     print(response)
 
-    matches = re.findall("\[[^\d]+\]", response)
-    print(matches)
-    start_index = response.find("[")
-    if start_index == -1:
-        return None
+    categories_match = re.search(r'\[\'(.*?)\'\]', response)
+    categories_list = categories_match.group(1).split("', '") if categories_match else None
 
-    end_index = response.find("]")
-    categories_str = response[start_index + 1:end_index]
-
-    categories_list = [category.strip("', ") for category in categories_str.split(",")]
+    print("-0-" * 30)
+    print(categories_list)
+    print("-0-" * 30)
     return categories_list
 
 
@@ -437,9 +406,10 @@ async def unfounded_city(query: types.CallbackQuery):
     print(user_state)
 
 
+# user_states[message.from_user.id].status == "waiting_for_city"
 @dp.message_handler(lambda message: user_states[message.from_user.id].status == "waiting_for_city")
 async def input_unfounded_city_name(message: types.Message):
-    print(input_unfounded_city_name)
+    print("input_unfounded_city_name")
     user_id = message.from_user.id
     user_state = user_states[user_id]
 
