@@ -1,4 +1,5 @@
 import re
+import calendar
 from collections import Counter
 from datetime import datetime
 import requests
@@ -47,6 +48,10 @@ async def start(message: types.Message):
 # Function to handle region selection
 @dp.message_handler(state=ProfileStatesGroup.name)
 async def load_name(message: types.Message, state: FSMContext):
+    if not re.match(r"^[A-Za-zА-Яа-я\s]+$", message.text):
+        await message.reply("Будь ласка, введіть реальне ім'я без спеціальних символів чи команд.")
+        return
+
     async with state.proxy() as data:
         data["name"] = message.text
 
@@ -55,11 +60,14 @@ async def load_name(message: types.Message, state: FSMContext):
 
 
 def birth_day_keyboard():
-    keyboard = InlineKeyboardMarkup(row_width=10)
+    keyboard = InlineKeyboardMarkup()
     days = list(range(1, 32))
-    for i in range(0, len(days), 10):
-        row = [InlineKeyboardButton(str(day), callback_data=f"day_{day}") for day in days[i:i + 10]]
-        keyboard.add(*row)
+    row = []
+    for day in days:
+        row.append(InlineKeyboardButton(str(day), callback_data=f"day_{day}"))
+        if len(row) == 8 or day == days[-1]:
+            keyboard.row(*row)
+            row = []
     return keyboard
 
 
@@ -92,6 +100,16 @@ async def select_birth_month(query: types.CallbackQuery, state: FSMContext):
     month_name = query.data.split("_")[2]
     async with state.proxy() as data:
         data["birth_month"] = month
+
+        if "birth_day" in data:  # Переконуємось, що день вже обраний
+            day = data["birth_day"]
+            year = datetime.now().year  # Використовуємо поточний рік для перевірки
+
+            if day > calendar.monthrange(year, month)[1]:
+                await query.message.reply("Ця дата не існує. Будь ласка, спочатку оберіть валідний день.",
+                                          reply_markup=birth_day_keyboard())
+                await ProfileStatesGroup.birth_day.set()
+                return
 
     await state.update_data(birth_month=month)
 
@@ -359,6 +377,7 @@ async def load_description(query: types.CallbackQuery):
     await bot.send_message(user_id, f"Оберіть область/області:", reply_markup=keyboard)
 
 
+
 @dp.callback_query_handler(
     lambda query: query.data in ALL_REGIONS_AND_CITIES.keys() or query.data == "back_region")
 async def select_region(query: types.CallbackQuery):
@@ -402,9 +421,9 @@ async def unfounded_city(query: types.CallbackQuery):
     await bot.edit_message_text("Введіть назву міста:", chat_id=user_id, message_id=message_id, reply_markup=keyboard)
 
     user_state = user_states[user_id]
-    print(user_state)
+    print(f"unfounded_city -  Setting status to 'waiting_for_city'")
     user_state.status = "waiting_for_city"
-    print(user_state)
+    print(f"unfounded_city -  Sending prompt to enter city name.")
 
 
 # user_states[message.from_user.id].status == "waiting_for_city"
@@ -415,6 +434,7 @@ async def input_unfounded_city_name(message: types.Message):
     user_state = user_states[user_id]
 
     town = message.text
+    print(f"input_unfounded_city_name - Received city name: {town}")
 
     data = {
         'apiKey': NOVA_POSHTA_API_KEY,
@@ -422,7 +442,9 @@ async def input_unfounded_city_name(message: types.Message):
         'calledMethod': 'getCities',
     }
 
+    print("input_unfounded_city_name - Sending request to API")
     response = requests.post(CITIES_SEARCH_URL, json=data)
+    print(f"input_unfounded_city_name - Response from API: {response.json()}")
 
     if response.status_code == 200 and response.json()["success"]:
 
