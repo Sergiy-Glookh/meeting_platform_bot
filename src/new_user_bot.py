@@ -442,9 +442,7 @@ async def input_unfounded_city_name(message: types.Message):
         'calledMethod': 'getCities',
     }
 
-    print("input_unfounded_city_name - Sending request to API")
     response = requests.post(CITIES_SEARCH_URL, json=data)
-    print(f"input_unfounded_city_name - Response from API: {response.json()}")
 
     if response.status_code == 200 and response.json()["success"]:
 
@@ -631,7 +629,8 @@ async def finish_selection_cities(query: types.CallbackQuery):
     user = User.objects(user_id=user_id).first()
     if user:
         user_info = f"{user.name}\n"
-        # user_info += f"День народження: {user.birth_day}/{user.birth_month}/{user.birth_year}\n"
+        formatted_birthday = user.birthday.strftime("%Y-%m-%d")
+        user_info += f"{formatted_birthday}\n"
         user_interests = ', '.join(user.interests)
         user_info += f"Інтереси: {user_interests}\n"
         selected_cities = ', '.join(selected_cities)
