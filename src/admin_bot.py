@@ -25,7 +25,7 @@ cancel_requests = {}
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 
-import uuid  # Імпорт для роботи з UUID
+import uuid
 from datetime import datetime
 
 @dp.callback_query_handler(lambda c: c.data == 'back', state=['waiting_for_month', 'waiting_for_day', 'waiting_for_hour', 'waiting_for_minute', 'waiting_for_year'])
@@ -61,7 +61,7 @@ async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
 
 def is_valid_uuid(s):
     try:
-        uuid.UUID(str(s), version=4)  # Перевірка на UUID версії 4
+        uuid.UUID(str(s), version=4)
         return True
     except ValueError:
         return False
@@ -77,28 +77,27 @@ async def view_meeting_details(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
 
     if is_valid_uuid(meeting_id):
-        # Якщо meeting_id є правильним UUID, виконуємо запит до бази даних (припустимо, що ваша колекція називається collection)
+
         meeting = collection.find_one({"_id": meeting_id})
 
         if meeting:
-            # Отримання даних про зустріч
+
             meeting_name = meeting['meeting_name']
             city = meeting['city']
             region = meeting['region']
             datetime_str = meeting['datetime']
 
-            # Перетворення рядка з датою та часом у об'єкт datetime
             meeting_datetime = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M')
 
-            # Підготовка відповіді для користувача
+
             response = f"Деталі про зустріч '{meeting_name}':\n"
             response += f"📅 Дата та час: {meeting_datetime}\n"
             response += f"🌍 Місто: {city}, {region}"
 
-            # Створення кнопки для повернення назад
+
             keyboard = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️ Назад', callback_data='view_meetings'))
 
-            # Відправка повідомлення з деталями зустрічі користувачеві
+
             await bot.send_message(user_id, response, reply_markup=keyboard)
         else:
             await bot.send_message(user_id, "Зустріч не знайдена.")
@@ -177,7 +176,7 @@ async def view_meeting_details(callback_query: CallbackQuery):
     else:
         await bot.send_message(user_id, "Зустріч не знайдена.")
 
-# Callback-функція для відображення списку учасників зустрічі
+
 @dp.callback_query_handler(lambda c: c.data.startswith('joined_meeting:'))
 async def show_joined_users(callback_query: CallbackQuery):
     meeting_id = callback_query.data.split(':')[1]
@@ -208,7 +207,7 @@ async def show_joined_users(callback_query: CallbackQuery):
 
     message = await bot.send_message(callback_query.from_user.id, response, reply_markup=keyboard)
 
-    # Збереження ідентифікатора повідомлення для подальшої обробки кнопки "Назад"
+
     await dp.current_state().update_data(prev_message_id=message.message_id)
 
 
@@ -881,23 +880,22 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
         selected_day = data["day"]
         selected_hour = data["hour"]
         selected_region = data["selected_region"]
-        selected_street = data.get("selected_street")  # Отримання назви вулиці зі стану
-        house_number = data.get("house_number")  # Отримання номеру будинку зі стану
-        comment = data.get("comment")  # Отримання коментаря зі стану
+        selected_street = data.get("selected_street")
+        house_number = data.get("house_number")
+        comment = data.get("comment")
 
-    # Отримання дати та часу
     date_time = datetime(selected_year, selected_month, selected_day, selected_hour, selected_minute)
     formatted_date_time = date_time.strftime('%Y-%m-%d %H:%M')
 
-    # Створення об'єкта для збереження в базі даних
+
     user_data = {
         "_id": meeting_id,
         "user_id": user_id,
         "city": selected_city,
         "region": f"{selected_region} обл.",
-        "street": selected_street,  # Збереження вулиці
-        "house_number": house_number,  # Збереження номеру будинку
-        "comment": comment,  # Збереження коментаря
+        "street": selected_street,
+        "house_number": house_number,
+        "comment": comment,
         "datetime": formatted_date_time,
         "timestamp": datetime.now(),
         "meeting_name": meeting_name,
@@ -905,19 +903,19 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
         "participants": []
     }
 
-    # Додавання запису до бази даних
+
     user_name = callback_query.from_user.username or callback_query.from_user.first_name
 
-    # Додавання запису до бази даних (без змін)
+
     collection.insert_one(user_data)
 
-    # Оновлення списку учасників у meetings_participants
+
     if formatted_date_time not in meetings_participants:
         meetings_participants[formatted_date_time] = [{"user_id": user_id, "username": user_name}]
     else:
         meetings_participants[formatted_date_time].append({"user_id": user_id, "username": user_name})
     if formatted_date_time not in meetings_participants:
-        meetings_participants[formatted_date_time] = [user_id]  # Додаємо створюючого користувача
+        meetings_participants[formatted_date_time] = [user_id]
     else:
         meetings_participants[formatted_date_time].append(user_id)
     response = (
@@ -927,9 +925,9 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
     await bot.send_message(callback_query.message.chat.id, response)
 
     join_button_text = "✅Приєднатися"
-    join_button_callback = f"join_{meeting_id}"  # Створення унікального callback_data для кнопки
+    join_button_callback = f"join_{meeting_id}"
 
-    # Створення кнопки для приєднання до зустрічі з унікальним callback_data
+
     join_button = InlineKeyboardButton(join_button_text, callback_data=join_button_callback)
     keyboard = InlineKeyboardMarkup()
     keyboard.add(join_button)
@@ -950,7 +948,7 @@ async def join_meeting(callback_query: types.CallbackQuery):
     meeting_id = callback_query.data.split('_')[1] if '_' in callback_query.data else None
 
     if meeting_id:
-        # Оновлення документу зустрічі, щоб додати інформацію про користувача до списку учасників
+
         collection.update_one(
             {"_id": meeting_id},
             {"$addToSet": {"participants": {"user_id": user_id, "username": user_name}}}
