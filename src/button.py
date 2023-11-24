@@ -108,3 +108,10 @@ def generate_streets_keyboard(street_list):
 
     return keyboard
 
+def create_confirmation_keyboard():
+    keyboard = InlineKeyboardMarkup()
+    keyboard.row(
+        InlineKeyboardButton('Так', callback_data='confirm_cancel'),
+        InlineKeyboardButton('Ні', callback_data='deny_cancel')
+    )
+    return keyboard
