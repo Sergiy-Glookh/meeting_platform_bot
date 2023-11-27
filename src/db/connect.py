@@ -1,14 +1,15 @@
 from dotenv import dotenv_values
 
-
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher
 from mongoengine import connect
 import speech_recognition as sr
+from db_manager import DatabaseManager
+import certifi
 
 from src.db.models import get_regions_and_cities
 
-config = dotenv_values("../.env")  # config = {"USER": "foo", "EMAIL": "foo@example.org"}
+config = dotenv_values("../.env")
 DB = config.get("DB")
 TOKEN_API = config.get("TOKEN_API")
 NOVA_POSHTA_API_KEY = config.get("NOVA_POSHTA_API_KEY")
