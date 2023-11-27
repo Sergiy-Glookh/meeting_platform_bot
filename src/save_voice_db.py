@@ -1,7 +1,7 @@
 import os
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
-from connect import *  #підключення до бази даних
+from src.db.connect import *  #підключення до бази даних
 from telegram.ext import Filters
 
 

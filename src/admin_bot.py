@@ -1,11 +1,9 @@
 import datetime
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram import Bot, Dispatcher, types
 from bson import ObjectId
-from connect import *
+from src.db.connect import *
 from api import get_info
-from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import CallbackQuery
+from aiogram.dispatcher.filters.state import State
 from aiogram.dispatcher import FSMContext
 from button import *
 
@@ -24,7 +22,7 @@ previous_keyboard = None
 from get_street_ref import *
 
 cancel_requests = {}
-from aiogram import Bot, Dispatcher, types
+from aiogram import types
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 
 import uuid
@@ -845,8 +843,6 @@ async def process_hour_input(callback_query: CallbackQuery, state: FSMContext):
         await state.update_data(hour=selected_hour)
         await state.set_state('waiting_for_minute')
 
-
-from models import  JoinedUsers
 
 @dp.callback_query_handler(lambda c: c.data.startswith('select_minute:'), state='waiting_for_minute')
 async def process_minute_input(callback_query: CallbackQuery, state: FSMContext):

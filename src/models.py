@@ -43,7 +43,7 @@
 
 
 from datetime import datetime
-from connect import client
+from src.db.connect import client
 
 
 db = client['my_db']
