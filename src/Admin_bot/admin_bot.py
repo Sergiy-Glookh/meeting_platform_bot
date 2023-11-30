@@ -2,9 +2,12 @@ import datetime
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher, types
 from bson import ObjectId
-from db.connect import *
-from api import get_info
+
+from src.db.connect import *
+from api import get_info, get_street_list, get_city_ref
+
 from aiogram.dispatcher.filters.state import State
+
 
 from aiogram.dispatcher import FSMContext
 from button import *
@@ -12,13 +15,14 @@ waiting_for_street = State()
 previous_states = {}
 previous_keyboard = None
 storage = MemoryStorage()
-bot = Bot(TOKEN)
+bot = Bot(TOKEN_ADMIN_API)
 dp = Dispatcher(bot, storage=storage)
 user_states = {}
 waiting_for_description = State()
 current_datetime = datetime.datetime.now()
 
-previous_keyboard = None
+
+#previous_keyboard = None
 
 
 cancel_requests = {}
