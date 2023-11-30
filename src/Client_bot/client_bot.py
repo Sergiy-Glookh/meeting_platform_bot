@@ -19,9 +19,9 @@ from g4f.Provider import (
     Bing,
 )
 
-from db.models import create_profile, edit_profile, get_regions_and_cities, UserState, City, add_location, User, \
+from src.db.models import create_profile, edit_profile, get_regions_and_cities, UserState, City, add_location, User, \
     add_interests
-from db.connect import recognizer, bot, dp, ALL_REGIONS_AND_CITIES, CATEGORIES, NOVA_POSHTA_API_KEY, CITIES_SEARCH_URL
+from src.db.connect import recognizer, bot, dp, ALL_REGIONS_AND_CITIES, CATEGORIES, NOVA_POSHTA_API_KEY, CITIES_SEARCH_URL
 
 
 user_states = {}
