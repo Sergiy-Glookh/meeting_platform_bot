@@ -1,35 +1,25 @@
-import datetime
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram import Bot, Dispatcher, types
-from bson import ObjectId
-
-from src.db.connect import *
-from api import get_info, get_street_list, get_city_ref
-
 from aiogram.dispatcher.filters.state import State
-
-
+from aiogram import Bot, Dispatcher, types
 from aiogram.dispatcher import FSMContext
+from api import get_info, get_street_list, get_city_ref
+from bson import ObjectId
+import datetime
+from src.db.admin_connect import *
 from button import *
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
+import uuid
+from datetime import datetime
+
+
 waiting_for_street = State()
 previous_states = {}
 previous_keyboard = None
-storage = MemoryStorage()
-bot = Bot(TOKEN_ADMIN_API)
-dp = Dispatcher(bot, storage=storage)
 user_states = {}
 waiting_for_description = State()
-current_datetime = datetime.datetime.now()
-
-
-#previous_keyboard = None
-
-
+current_datetime = datetime.now()
 cancel_requests = {}
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 
-import uuid
-from datetime import datetime
 
 @dp.callback_query_handler(lambda c: c.data == 'back', state=['waiting_for_month', 'waiting_for_day', 'waiting_for_hour', 'waiting_for_minute', 'waiting_for_year'])
 async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
@@ -81,7 +71,7 @@ async def view_meeting_details(callback_query: CallbackQuery):
 
     if is_valid_uuid(meeting_id):
 
-        meeting = collection.find_one({"_id": meeting_id})
+        meeting = collections.find_one({"_id": meeting_id})
 
         if meeting:
 
