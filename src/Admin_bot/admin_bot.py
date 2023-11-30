@@ -2,7 +2,7 @@ import datetime
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher, types
 from bson import ObjectId
-from connect import *
+from db.connect import *
 from api import get_info
 from aiogram.dispatcher.filters.state import State
 
@@ -19,7 +19,7 @@ waiting_for_description = State()
 current_datetime = datetime.datetime.now()
 
 previous_keyboard = None
-from get_street_ref import *
+
 
 cancel_requests = {}
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
