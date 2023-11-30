@@ -4,8 +4,6 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import Bot, Dispatcher
 from mongoengine import connect
 import speech_recognition as sr
-from db_manager import DatabaseManager
-import certifi
 
 from src.db.models import get_regions_and_cities
 
