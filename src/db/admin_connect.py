@@ -7,11 +7,12 @@ import speech_recognition as sr
 from src.db.models import get_regions_and_cities
 
 
-config = dotenv_values("../.env")
+config = dotenv_values()
 DB = config.get("DB")
 TOKEN_ADMIN_API = config.get("TOKEN_ADMIN_API")
 NOVA_POSHTA_API_KEY = config.get("NOVA_POSHTA_API_KEY")
 CITIES_SEARCH_URL = config.get("CITIES_SEARCH_URL")
+GROUP_ID = config.get('BOT', 'GROUP_ID')
 
 connect(db='meeting-bot', host=DB)
 

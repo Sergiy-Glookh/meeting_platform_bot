@@ -23,9 +23,7 @@ from src.db.models import create_profile, edit_profile, get_regions_and_cities, 
     add_interests
 from src.db.client_connect import recognizer, bot, dp, ALL_REGIONS_AND_CITIES, CATEGORIES, NOVA_POSHTA_API_KEY, CITIES_SEARCH_URL
 
-
 user_states = {}
-
 
 class ProfileStatesGroup(StatesGroup):
     name = State()

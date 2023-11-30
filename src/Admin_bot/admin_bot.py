@@ -1,11 +1,12 @@
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import State
-from aiogram import Bot, Dispatcher, types
+from aiogram import types
 from aiogram.dispatcher import FSMContext
 from api import get_info, get_street_list, get_city_ref
 from bson import ObjectId
 import datetime
 from src.db.admin_connect import *
+from src.db.models import Meeting
 from button import *
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 import uuid
@@ -71,7 +72,9 @@ async def view_meeting_details(callback_query: CallbackQuery):
 
     if is_valid_uuid(meeting_id):
 
-        meeting = collections.find_one({"_id": meeting_id})
+        #meeting = Meeting.objects({"_id": meeting_id})
+        meeting = Meeting.objects(meeting_id = meeting_id).first()
+
 
         if meeting:
 
@@ -103,7 +106,8 @@ async def view_meeting_details(callback_query: CallbackQuery):
 async def view_active_meetings(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
 
-    active_meetings = collection.find({"user_id": user_id})
+    #active_meetings = collection.find({"user_id": user_id})
+    active_meetings = Meeting.objects(user_id=user_id)
 
     if active_meetings:
         response = "🍻Ваші активні зустрічі:\n"
@@ -133,11 +137,6 @@ async def view_active_meetings(callback_query: CallbackQuery):
     await bot.send_message(user_id, response, reply_markup=keyboard)
 
 
-
-
-
-
-
 @dp.callback_query_handler(lambda c: c.data == 'back_to_menu')
 async def back_to_main_menu(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
@@ -149,7 +148,7 @@ async def view_meeting_details(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     meeting_id = callback_query.data.split(':')[1]
 
-    meeting = collection.find_one({"_id": meeting_id})
+    meeting = Meeting.objects(meeting_id=meeting_id).first()
 
     if meeting:
         meeting_name = meeting['meeting_name']
@@ -173,7 +172,9 @@ async def view_meeting_details(callback_query: CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data.startswith('joined_meeting:'))
 async def show_joined_users(callback_query: CallbackQuery):
     meeting_id = callback_query.data.split(':')[1]
-    meeting = collection.find_one({"_id": meeting_id})
+    #meeting = collection.find_one({"_id": meeting_id})
+    #TODO:
+    meeting = Meeting.objects()
 
     keyboard = None
 
@@ -203,8 +204,6 @@ async def show_joined_users(callback_query: CallbackQuery):
     await dp.current_state().update_data(prev_message_id=message.message_id)
 
 
-
-
 @dp.callback_query_handler(lambda c: c.data == 'back_to_list')
 async def back_to_list(callback_query: CallbackQuery):
     data = await dp.current_state().get_data()
@@ -214,23 +213,12 @@ async def back_to_list(callback_query: CallbackQuery):
     await bot.delete_message(callback_query.from_user.id, prev_message_id)
 
 
-
-
-
-
-
-
-
-
-
-
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_meeting:'))
 async def edit_meeting(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     meeting_id = callback_query.data.split(':')[1]
 
-
-    meeting = collection.find_one({"_id": ObjectId(meeting_id)})
+    meeting = Meeting.objects(meeting_id=ObjectId(meeting_id)).first()
 
     if meeting:
 
@@ -241,18 +229,16 @@ async def edit_meeting(callback_query: CallbackQuery):
         keyboard.add(InlineKeyboardButton("🌍 Редагувати локацію", callback_data=f'edit_location:{meeting_id}'))
         keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data='back'))  # Змініть callback_data на 'back'
 
-
         response = "Виберіть параметр, який ви хочете редагувати."
         await bot.send_message(user_id, response, reply_markup=keyboard)
     else:
         await bot.send_message(user_id, "Зустріч не знайдена.")
 
 
-
 @dp.callback_query_handler(lambda c: c.data == 'back')
 async def back_to_meetings_menu(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
-    active_meetings = collection.find({"user_id": user_id})
+    active_meetings = Meeting.objects(user_id=user_id)
 
     if active_meetings:
         response = "🍻Ваші активні зустрічі:\n"
@@ -281,15 +267,13 @@ async def back_to_meetings_menu(callback_query: CallbackQuery):
 
     await bot.send_message(user_id, response, reply_markup=keyboard)
 
-
-
+"""
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_name:'))
 async def edit_meeting_name(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     meeting_id = callback_query.data.split(':')[1]
 
-
-    meeting = collection.find_one({"_id": ObjectId(meeting_id)})
+    meeting = Meeting.objects(meeting_id=ObjectId(meeting_id)).update(set__meeting_name=new_meeting_name)
 
     if meeting:
         response = "Введіть нову назву для зустрічі:"
@@ -320,12 +304,13 @@ async def edit_meeting_name(callback_query: CallbackQuery):
     else:
         await bot.send_message(user_id, "Зустріч не знайдена.")
 
+
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_description:'))
 async def edit_meeting_description(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     meeting_id = callback_query.data.split(':')[1]
 
-    meeting = collection.find_one({"_id": ObjectId(meeting_id)})
+    meeting = Meeting.objects(meeting_id=ObjectId(meeting_id)).update(set__description=new_description)
 
     if meeting:
         response = "Введіть новий опис для зустрічі:"
@@ -354,19 +339,12 @@ async def edit_meeting_description(callback_query: CallbackQuery):
         await bot.send_message(user_id, "Зустріч не знайдена.")
 
 
-
-
-
-
-
-
-
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_month:'))
 async def edit_month(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     meeting_id = callback_query.data.split(':')[1]
 
-    meeting = collection.find_one({"_id": ObjectId(meeting_id)})
+    meeting = Meeting.objects(meeting_id=ObjectId(meeting_id)).update(set__month=int(selected_month))
     current_month = meeting.get('month') if meeting else 'не визначено'
 
     await bot.send_message(user_id, f"Поточний місяць для проведення зустрічі: {current_month}. Виберіть новий місяць:", reply_markup=month_keyboard)
@@ -379,9 +357,7 @@ async def select_month(callback_query: CallbackQuery):
     selected_month = callback_query.data.split(":")[1]
     meeting_id = user_states[user_id]['meeting_id']
 
-
-    collection.update_one({"_id": ObjectId(meeting_id)}, {"$set": {"month": int(selected_month)}})
-
+    Meeting.objects(meeting_id=ObjectId(meeting_id)).update(set__month=int(selected_month))
 
     keyboard = InlineKeyboardMarkup()
     keyboard.add(
@@ -401,17 +377,13 @@ async def select_month(callback_query: CallbackQuery):
     await bot.send_message(user_id, f"Місяць змінено на {selected_month}", reply_markup=keyboard)
 
 
-
-
-
 @dp.callback_query_handler(lambda c: c.data.startswith('select_month:'))
 async def select_month(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     selected_month = callback_query.data.split(":")[1]
     meeting_id = callback_query.data.split(":")[2]
 
-
-    collection.update_one({"_id": ObjectId(meeting_id)}, {"$set": {"month": int(selected_month)}})
+    Meeting.objects(meeting_id=ObjectId(meeting_id)).update(set__month=int(selected_month))
 
     await bot.send_message(user_id, f"Місяць змінено на {selected_month}")
 
@@ -419,9 +391,7 @@ async def create_back_button():
     keyboard = InlineKeyboardMarkup()
     keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data='back_to_meetings'))
     return keyboard
-
-
-
+"""
 
 @dp.callback_query_handler(lambda c: c.data.startswith('cancel_meeting:'))
 async def cancel_meeting(callback_query: CallbackQuery):
@@ -429,14 +399,10 @@ async def cancel_meeting(callback_query: CallbackQuery):
     meeting_id = callback_query.data.split(':')[1]
 
     if is_valid_uuid(meeting_id):
-
-        meeting = collection.find_one({"_id": meeting_id})
-
+        meeting = Meeting.objects(meeting_id=meeting_id)
         if meeting:
             try:
-
                 confirmation_keyboard = create_confirmation_keyboard()
-
 
                 await bot.send_message(user_id, "Ви впевнені, що хочете скасувати зустріч?", reply_markup=confirmation_keyboard)
             except Exception as e:
@@ -451,13 +417,11 @@ async def cancel_meeting(callback_query: CallbackQuery):
 @dp.message_handler(lambda message: message.text and message.text != 'Так' and message.from_user.id in cancel_requests)
 async def handle_cancel_reason(message: Message):
     user_id = message.from_user.id
-
-
     cancel_reason = message.text
 
     del cancel_requests[user_id]
 
-
+"""
 @dp.callback_query_handler(lambda c: c.data.startswith('cancel_meeting:'))
 async def cancel_meeting(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
@@ -486,7 +450,7 @@ async def cancel_meeting(callback_query: CallbackQuery):
             await bot.send_message(user_id, "Зустріч не знайдена.")
     else:
         await bot.send_message(user_id, "Недійсний ідентифікатор зустрічі.")
-
+"""
 
 @dp.callback_query_handler(lambda c: c.data == 'confirm_cancel')
 async def confirm_cancel(callback_query: CallbackQuery):
@@ -508,11 +472,9 @@ async def deny_cancel(callback_query: CallbackQuery):
         del cancel_requests[user_id]
 
 
-
 @dp.callback_query_handler(lambda c: c.data == 'back_to_meetings')
 async def back_to_meetings(callback_query: CallbackQuery):
     await view_active_meetings(callback_query)
-
 
 
 @dp.callback_query_handler(lambda c: c.data == 'create_meeting', state='*')
@@ -525,12 +487,9 @@ async def start_create_meeting(callback_query: CallbackQuery, state: FSMContext)
 
     keyboard_with_back = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️Назад', callback_data='back'))
 
-
     await bot.send_message(callback_query.message.chat.id, '📝Вкажіть назву для Вашої зустрічі:',
                            reply_markup=keyboard_with_back)
     await state.set_state('waiting_for_meeting_name')
-
-
 
 
 @dp.message_handler(lambda message: len(message.text), state='waiting_for_meeting_name')
@@ -575,6 +534,7 @@ async def process_description_input(message: types.Message, state: FSMContext):
     keyboard_back = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️Назад', callback_data='back_to_description'))
     await message.answer('✅ Ви успішно ввели опис зустрічі. Тепер вкажіть назву населеного пункту (міста), де буде зустріч:', reply_markup=keyboard_back)
     await state.set_state('waiting_for_town')
+
 @dp.callback_query_handler(lambda c: c.data == 'back_to_description', state='waiting_for_town')
 async def process_back_to_description_button(callback_query: CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
@@ -652,7 +612,6 @@ async def process_selected_town(callback_query: CallbackQuery, state: FSMContext
             await state.set_state('waiting_for_street')
         else:
             await bot.send_message(callback_query.message.chat.id, "Не вдалося отримати референс міста. Спробуйте ще раз.")
-
 
 
 @dp.message_handler(state='waiting_for_street')
@@ -739,8 +698,6 @@ async def back_to_street_selection(callback_query: CallbackQuery, state: FSMCont
     await state.set_state('waiting_for_street')
 
 
-
-
 @dp.callback_query_handler(lambda c: c.data.startswith('confirm_data'), state='waiting_for_year')
 async def process_confirm_data(callback_query: CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
@@ -766,15 +723,10 @@ async def process_year_input(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state('waiting_for_month')
 
 
-
-
-
 @dp.callback_query_handler(lambda c: c.data.startswith('select_month:'), state='waiting_for_month')
 async def process_month_input(callback_query: CallbackQuery, state: FSMContext):
     selected_month = callback_query.data.split(':')[1]
     selected_month = int(selected_month)
-
-
 
 
     async with state.proxy() as data:
@@ -791,9 +743,6 @@ async def process_month_input(callback_query: CallbackQuery, state: FSMContext):
 async def process_day_input(callback_query: CallbackQuery, state: FSMContext):
     selected_day = callback_query.data.split(':')[1]
     selected_day = int(selected_day)
-
-
-
 
     async with state.proxy() as data:
         selected_year = data["year"]
@@ -814,10 +763,6 @@ async def process_hour_input(callback_query: CallbackQuery, state: FSMContext):
     selected_hour = callback_query.data.split(':')[1]
     selected_hour = int(selected_hour)
 
-
-
-
-
     async with state.proxy() as data:
         selected_year = data["year"]
         selected_month = data["month"]
@@ -833,8 +778,6 @@ async def process_hour_input(callback_query: CallbackQuery, state: FSMContext):
         await bot.send_message(callback_query.message.chat.id, '⏱️Виберіть хвилину:', reply_markup=minute_keyboard)
         await state.update_data(hour=selected_hour)
         await state.set_state('waiting_for_minute')
-
-
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('select_minute:'), state='waiting_for_minute')
@@ -858,6 +801,7 @@ async def process_minute_input(callback_query: CallbackQuery, state: FSMContext)
         await create_meeting(callback_query, state, selected_minute)
 
 meetings_participants = {}
+
 
 async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selected_minute: int):
     meeting_id = str(uuid.uuid4())
@@ -898,8 +842,9 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
 
     user_name = callback_query.from_user.username or callback_query.from_user.first_name
 
-
-    collection.insert_one(user_data)
+    #TODO:
+    #collection.insert_one(user_data)
+    #Meeting.objects.insert_one(user_data)
 
 
     if formatted_date_time not in meetings_participants:
@@ -931,21 +876,15 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
     await bot.send_message(callback_query.message.chat.id, "Ваша зустріч була успішно створена.", reply_markup=kb_client)
 
 
-
 @dp.callback_query_handler(lambda callback_query: True)
 async def join_meeting(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     user_name = callback_query.from_user.username or callback_query.from_user.first_name
-
     meeting_id = callback_query.data.split('_')[1] if '_' in callback_query.data else None
 
     if meeting_id:
-
-        collection.update_one(
-            {"_id": meeting_id},
-            {"$addToSet": {"participants": {"user_id": user_id, "username": user_name}}}
-        )
-
+        Meeting.objects(meeting_id=meeting_id).update_one(
+            add_to_set__participants={"user_id": user_id, "username": user_name})
         await bot.answer_callback_query(callback_query.id, text="Ви приєднались до зустрічі!")
     else:
         await bot.answer_callback_query(callback_query.id, text="Помилка: Не знайдено ідентифікатора зустрічі")

@@ -111,3 +111,14 @@ def get_regions_and_cities():
     except DoesNotExist:
         print("Regions not found")
     return regions_and_cities
+
+#TODO:
+class Meeting(Document):
+    meeting_id = StringField(primary_key=True)
+    user_id_admin = StringField(required=True)
+    meeting_name = StringField(required=True)
+    description = StringField()
+    city = StringField(required=True)
+    region = StringField(required=True)
+    datetime = DateTimeField(required=True)
+    participants = ListField()
