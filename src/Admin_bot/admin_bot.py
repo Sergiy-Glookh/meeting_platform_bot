@@ -12,7 +12,6 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBut
 import uuid
 from datetime import datetime
 
-
 waiting_for_street = State()
 previous_states = {}
 previous_keyboard = None
@@ -22,7 +21,9 @@ current_datetime = datetime.now()
 cancel_requests = {}
 
 
-@dp.callback_query_handler(lambda c: c.data == 'back', state=['waiting_for_month', 'waiting_for_day', 'waiting_for_hour', 'waiting_for_minute', 'waiting_for_year'])
+@dp.callback_query_handler(lambda c: c.data == 'back',
+                           state=['waiting_for_month', 'waiting_for_day', 'waiting_for_hour', 'waiting_for_minute',
+                                  'waiting_for_year'])
 async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
     if current_state == 'waiting_for_minute':
@@ -45,13 +46,15 @@ async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
             await state.set_state(previous_state['state'])
             await state.update_data(previous_state['data'])
 
-            await bot.send_message(callback_query.message.chat.id, previous_state['text'], reply_markup=previous_state['keyboard'])
+            await bot.send_message(callback_query.message.chat.id, previous_state['text'],
+                                   reply_markup=previous_state['keyboard'])
         else:
             await state.set_state('waiting_for_selected_town')
             await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
     else:
         await state.set_state('waiting_for_selected_town')
         await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
+
 
 def is_valid_uuid(s):
     try:
@@ -65,6 +68,7 @@ def is_valid_uuid(s):
 async def start_def(message: types.Message):
     await message.answer('Привіт, що хочеш зробити?🤔', reply_markup=kb_client)
 
+
 @dp.callback_query_handler(lambda c: c.data.startswith('view_meeting:'))
 async def view_meeting_details(callback_query: CallbackQuery):
     meeting_id = callback_query.data.split(':')[1]
@@ -72,9 +76,8 @@ async def view_meeting_details(callback_query: CallbackQuery):
 
     if is_valid_uuid(meeting_id):
 
-        #meeting = Meeting.objects({"_id": meeting_id})
-        meeting = Meeting.objects(meeting_id = meeting_id).first()
-
+        # meeting = Meeting.objects({"_id": meeting_id})
+        meeting = Meeting.objects(meeting_id=meeting_id).first()
 
         if meeting:
 
@@ -83,17 +86,13 @@ async def view_meeting_details(callback_query: CallbackQuery):
             region = meeting['region']
             datetime_str = meeting['datetime']
 
-
             meeting_datetime = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M')
-
 
             response = f"Деталі про зустріч '{meeting_name}':\n"
             response += f"📅 Дата та час: {meeting_datetime}\n"
             response += f"🌍 Місто: {city}, {region}"
 
-
             keyboard = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️ Назад', callback_data='view_meetings'))
-
 
             await bot.send_message(user_id, response, reply_markup=keyboard)
         else:
@@ -106,7 +105,7 @@ async def view_meeting_details(callback_query: CallbackQuery):
 async def view_active_meetings(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
 
-    #active_meetings = collection.find({"user_id": user_id})
+    # active_meetings = collection.find({"user_id": user_id})
     active_meetings = Meeting.objects(user_id=user_id)
 
     if active_meetings:
@@ -169,12 +168,12 @@ async def view_meeting_details(callback_query: CallbackQuery):
     else:
         await bot.send_message(user_id, "Зустріч не знайдена.")
 
+
 @dp.callback_query_handler(lambda c: c.data.startswith('joined_meeting:'))
 async def show_joined_users(callback_query: CallbackQuery):
     meeting_id = callback_query.data.split(':')[1]
-    #meeting = collection.find_one({"_id": meeting_id})
-    #TODO:
-    meeting = Meeting.objects()
+
+    meeting = Meeting.objects(meeting_id=meeting_id).first()
 
     keyboard = None
 
@@ -266,6 +265,7 @@ async def back_to_meetings_menu(callback_query: CallbackQuery):
         keyboard = kb_client
 
     await bot.send_message(user_id, response, reply_markup=keyboard)
+
 
 """
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_name:'))
@@ -393,6 +393,7 @@ async def create_back_button():
     return keyboard
 """
 
+
 @dp.callback_query_handler(lambda c: c.data.startswith('cancel_meeting:'))
 async def cancel_meeting(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
@@ -404,7 +405,8 @@ async def cancel_meeting(callback_query: CallbackQuery):
             try:
                 confirmation_keyboard = create_confirmation_keyboard()
 
-                await bot.send_message(user_id, "Ви впевнені, що хочете скасувати зустріч?", reply_markup=confirmation_keyboard)
+                await bot.send_message(user_id, "Ви впевнені, що хочете скасувати зустріч?",
+                                       reply_markup=confirmation_keyboard)
             except Exception as e:
                 print(f"Помилка при скасуванні зустрічі: {e}")
                 await bot.send_message(user_id, "Помилка при скасуванні зустрічі.")
@@ -420,6 +422,7 @@ async def handle_cancel_reason(message: Message):
     cancel_reason = message.text
 
     del cancel_requests[user_id]
+
 
 """
 @dp.callback_query_handler(lambda c: c.data.startswith('cancel_meeting:'))
@@ -452,13 +455,13 @@ async def cancel_meeting(callback_query: CallbackQuery):
         await bot.send_message(user_id, "Недійсний ідентифікатор зустрічі.")
 """
 
+
 @dp.callback_query_handler(lambda c: c.data == 'confirm_cancel')
 async def confirm_cancel(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
 
     if user_id in cancel_requests:
         meeting_data = cancel_requests[user_id]['meeting_data']
-
 
         await bot.send_message(user_id, "Введіть, будь ласка, причину скасування зустрічі:")
 
@@ -468,7 +471,6 @@ async def deny_cancel(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
 
     if user_id in cancel_requests:
-
         del cancel_requests[user_id]
 
 
@@ -504,24 +506,29 @@ async def process_meeting_name_input(message: types.Message, state: FSMContext):
     await message.answer('✅ Ви успішно ввели назву зустрічі. Тепер вкажіть опис зустрічі:', reply_markup=keyboard_back)
     await state.set_state('waiting_for_description')
 
+
 @dp.callback_query_handler(lambda c: c.data == 'back_to_meeting_name', state='waiting_for_description')
 async def process_back_button_to_meeting_name(callback_query: CallbackQuery, state: FSMContext):
     keyboard_with_back = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️Назад', callback_data='back'))
-    await bot.send_message(callback_query.message.chat.id, '📝Вкажіть назву для Вашої зустрічі:', reply_markup=keyboard_with_back)
+    await bot.send_message(callback_query.message.chat.id, '📝Вкажіть назву для Вашої зустрічі:',
+                           reply_markup=keyboard_with_back)
     await state.set_state('waiting_for_meeting_name')
+
 
 @dp.callback_query_handler(lambda c: c.data == 'back', state=['waiting_for_meeting_name', 'waiting_for_description'])
 async def process_back_button_to_previous_state(callback_query: CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
     if user_id in previous_states:
         previous_state = previous_states[user_id]
-        await bot.send_message(callback_query.message.chat.id, previous_state['text'], reply_markup=previous_state['keyboard'])
+        await bot.send_message(callback_query.message.chat.id, previous_state['text'],
+                               reply_markup=previous_state['keyboard'])
         await state.set_state(previous_state['state'])
 
         del previous_states[user_id]
     else:
         await bot.send_message(callback_query.message.chat.id, '🤔 Виберіть опцію:', reply_markup=kb_client)
         await state.finish()
+
 
 @dp.message_handler(lambda message: len(message.text), state='waiting_for_description')
 async def process_description_input(message: types.Message, state: FSMContext):
@@ -532,8 +539,11 @@ async def process_description_input(message: types.Message, state: FSMContext):
         data['previous_state'] = 'waiting_for_description'
 
     keyboard_back = InlineKeyboardMarkup().add(InlineKeyboardButton('↩️Назад', callback_data='back_to_description'))
-    await message.answer('✅ Ви успішно ввели опис зустрічі. Тепер вкажіть назву населеного пункту (міста), де буде зустріч:', reply_markup=keyboard_back)
+    await message.answer(
+        '✅ Ви успішно ввели опис зустрічі. Тепер вкажіть назву населеного пункту (міста), де буде зустріч:',
+        reply_markup=keyboard_back)
     await state.set_state('waiting_for_town')
+
 
 @dp.callback_query_handler(lambda c: c.data == 'back_to_description', state='waiting_for_town')
 async def process_back_to_description_button(callback_query: CallbackQuery, state: FSMContext):
@@ -541,8 +551,10 @@ async def process_back_to_description_button(callback_query: CallbackQuery, stat
         previous_message = data.get('previous_message')
         previous_keyboard = data.get('previous_keyboard')
         if previous_message:
-            await bot.send_message(callback_query.message.chat.id, previous_message.text, reply_markup=previous_keyboard)
+            await bot.send_message(callback_query.message.chat.id, previous_message.text,
+                                   reply_markup=previous_keyboard)
     await state.set_state('waiting_for_description')
+
 
 @dp.message_handler(state='waiting_for_town')
 async def process_town_input(message: types.Message, state: FSMContext):
@@ -567,7 +579,9 @@ async def process_town_input(message: types.Message, state: FSMContext):
     else:
         await message.answer("Назва населеного пункту некоректна😢. Введіть іншу назву:")
 
-@dp.callback_query_handler(lambda c: c.data == 'back', state=['waiting_for_selected_town', 'waiting_for_selected_street'])
+
+@dp.callback_query_handler(lambda c: c.data == 'back',
+                           state=['waiting_for_selected_town', 'waiting_for_selected_street'])
 async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
     if current_state == 'waiting_for_selected_street':
@@ -594,11 +608,9 @@ async def process_selected_town(callback_query: CallbackQuery, state: FSMContext
         await state.update_data(selected_region=region)
         location_info = f'✅Ви обрали "{city}" ({region} обл.)'
 
-
         city_ref = get_city_ref(selected_town)
         if city_ref:
             await state.update_data(city_ref=city_ref)
-
 
             keyboard = InlineKeyboardMarkup()
             keyboard.add(
@@ -608,10 +620,12 @@ async def process_selected_town(callback_query: CallbackQuery, state: FSMContext
                 )
             )
 
-            await bot.send_message(callback_query.message.chat.id, f'{location_info}\n\n🛣️ Введіть назву вулиці:', reply_markup=keyboard)
+            await bot.send_message(callback_query.message.chat.id, f'{location_info}\n\n🛣️ Введіть назву вулиці:',
+                                   reply_markup=keyboard)
             await state.set_state('waiting_for_street')
         else:
-            await bot.send_message(callback_query.message.chat.id, "Не вдалося отримати референс міста. Спробуйте ще раз.")
+            await bot.send_message(callback_query.message.chat.id,
+                                   "Не вдалося отримати референс міста. Спробуйте ще раз.")
 
 
 @dp.message_handler(state='waiting_for_street')
@@ -629,6 +643,7 @@ async def process_street_input(message: types.Message, state: FSMContext):
         await state.set_state('waiting_for_selected_street')
     else:
         await bot.send_message(message.chat.id, "Вулиць не знайдено.")
+
 
 @dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street')
 async def process_selected_street(callback_query: CallbackQuery, state: FSMContext):
@@ -650,9 +665,7 @@ async def process_selected_street(callback_query: CallbackQuery, state: FSMConte
 async def process_house_number_input(message: types.Message, state: FSMContext):
     house_number = message.text
 
-
     await state.update_data(house_number=house_number)
-
 
     await bot.send_message(message.chat.id, "Введіть коментар:")
     await state.set_state('waiting_for_comment')
@@ -662,15 +675,12 @@ async def process_house_number_input(message: types.Message, state: FSMContext):
 async def process_comment_input(message: types.Message, state: FSMContext):
     comment = message.text
 
-
     await state.update_data(comment=comment)
-
 
     async with state.proxy() as data:
         selected_street = data.get('selected_street')
         house_number = data.get('house_number')
         comment = data.get('comment')
-
 
     keyboard = InlineKeyboardMarkup()
     keyboard.add(
@@ -679,7 +689,6 @@ async def process_comment_input(message: types.Message, state: FSMContext):
             callback_data='confirm_data'
         )
     )
-
 
     keyboard.add(
         InlineKeyboardButton(
@@ -691,6 +700,7 @@ async def process_comment_input(message: types.Message, state: FSMContext):
     await bot.send_message(message.chat.id, "Натисни для підтвердження:", reply_markup=keyboard)
 
     await state.set_state('waiting_for_year')
+
 
 @dp.callback_query_handler(lambda c: c.data == 'back_to_street_selection', state='waiting_for_year')
 async def back_to_street_selection(callback_query: CallbackQuery, state: FSMContext):
@@ -706,7 +716,6 @@ async def process_confirm_data(callback_query: CallbackQuery, state: FSMContext)
         comment = data.get('comment')
 
     meeting_info = f"Зустріч відбудеться по вулиці {selected_street}, будинок {house_number}. Коментар: {comment}"
-
 
     await bot.send_message(callback_query.message.chat.id, meeting_info)
     await bot.send_message(callback_query.message.chat.id, 'Виберіть рік:', reply_markup=year_keyboard)
@@ -728,17 +737,19 @@ async def process_month_input(callback_query: CallbackQuery, state: FSMContext):
     selected_month = callback_query.data.split(':')[1]
     selected_month = int(selected_month)
 
-
     async with state.proxy() as data:
         selected_year = data["year"]
 
-
-    if (selected_year < current_datetime.year) or (selected_year == current_datetime.year and selected_month < current_datetime.month):
-        await bot.send_message(callback_query.message.chat.id, "Ви не можете вибрати місяць в минулому. Виберіть інший місяць.")
+    if (selected_year < current_datetime.year) or (
+            selected_year == current_datetime.year and selected_month < current_datetime.month):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати місяць в минулому. Виберіть інший місяць.")
     else:
         await bot.send_message(callback_query.message.chat.id, '🌝Виберіть день:', reply_markup=day_keyboard)
         await state.update_data(month=selected_month)
         await state.set_state('waiting_for_day')
+
+
 @dp.callback_query_handler(lambda c: c.data.startswith('select_day:'), state='waiting_for_day')
 async def process_day_input(callback_query: CallbackQuery, state: FSMContext):
     selected_day = callback_query.data.split(':')[1]
@@ -749,9 +760,11 @@ async def process_day_input(callback_query: CallbackQuery, state: FSMContext):
         selected_month = data["month"]
 
     if (selected_year < current_datetime.year) or \
-       (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day):
-        await bot.send_message(callback_query.message.chat.id, "Ви не можете вибрати день в минулому. Виберіть інший день.")
+            (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати день в минулому. Виберіть інший день.")
     else:
         await bot.send_message(callback_query.message.chat.id, '🕛Виберіть годину:', reply_markup=hour_keyboard)
         await state.update_data(day=selected_day)
@@ -768,12 +781,14 @@ async def process_hour_input(callback_query: CallbackQuery, state: FSMContext):
         selected_month = data["month"]
         selected_day = data["day"]
 
-
     if (selected_year < current_datetime.year) or \
-       (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour):
-        await bot.send_message(callback_query.message.chat.id, "Ви не можете вибрати годину в минулому. Виберіть іншу годину.")
+            (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати годину в минулому. Виберіть іншу годину.")
     else:
         await bot.send_message(callback_query.message.chat.id, '⏱️Виберіть хвилину:', reply_markup=minute_keyboard)
         await state.update_data(hour=selected_hour)
@@ -792,13 +807,18 @@ async def process_minute_input(callback_query: CallbackQuery, state: FSMContext)
         selected_hour = data["hour"]
 
     if (selected_year < current_datetime.year) or \
-       (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour) or \
-       (selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour == current_datetime.hour and selected_minute < current_datetime.minute):
-        await bot.send_message(callback_query.message.chat.id, "Ви не можете вибрати хвилину в минулому. Виберіть іншу хвилину.")
+            (selected_year == current_datetime.year and selected_month < current_datetime.month) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day < current_datetime.day) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour < current_datetime.hour) or \
+            (
+                    selected_year == current_datetime.year and selected_month == current_datetime.month and selected_day == current_datetime.day and selected_hour == current_datetime.hour and selected_minute < current_datetime.minute):
+        await bot.send_message(callback_query.message.chat.id,
+                               "Ви не можете вибрати хвилину в минулому. Виберіть іншу хвилину.")
     else:
         await create_meeting(callback_query, state, selected_minute)
+
 
 meetings_participants = {}
 
@@ -819,10 +839,8 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
         house_number = data.get("house_number")
         comment = data.get("comment")
 
-
     date_time = datetime(selected_year, selected_month, selected_day, selected_hour, selected_minute)
     formatted_date_time = date_time.strftime('%Y-%m-%d %H:%M')
-
 
     user_data = {
         "_id": meeting_id,
@@ -839,13 +857,9 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
         "participants": []
     }
 
-
     user_name = callback_query.from_user.username or callback_query.from_user.first_name
 
-    #TODO:
-    #collection.insert_one(user_data)
-    #Meeting.objects.insert_one(user_data)
-
+    Meeting(**user_data)
 
     if formatted_date_time not in meetings_participants:
         meetings_participants[formatted_date_time] = [{"user_id": user_id, "username": user_name}]
@@ -864,7 +878,6 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
     join_button_text = "✅Приєднатися"
     join_button_callback = f"join_{meeting_id}"
 
-
     join_button = InlineKeyboardButton(join_button_text, callback_data=join_button_callback)
     keyboard = InlineKeyboardMarkup()
     keyboard.add(join_button)
@@ -873,7 +886,8 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
 
     await state.finish()
 
-    await bot.send_message(callback_query.message.chat.id, "Ваша зустріч була успішно створена.", reply_markup=kb_client)
+    await bot.send_message(callback_query.message.chat.id, "Ваша зустріч була успішно створена.",
+                           reply_markup=kb_client)
 
 
 @dp.callback_query_handler(lambda callback_query: True)
@@ -889,7 +903,8 @@ async def join_meeting(callback_query: types.CallbackQuery):
     else:
         await bot.answer_callback_query(callback_query.id, text="Помилка: Не знайдено ідентифікатора зустрічі")
 
+
 if __name__ == "__main__":
     from aiogram import executor
-    executor.start_polling(dp, skip_updates=True)
 
+    executor.start_polling(dp, skip_updates=True)
