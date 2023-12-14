@@ -56,6 +56,7 @@ async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
         await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
 """
 
+
 def is_valid_uuid(s):
     try:
         uuid.UUID(str(s), version=4)
@@ -577,7 +578,7 @@ async def process_town_input(message: types.Message, state: FSMContext):
             'data': data,
         }
     else:
-        await message.answer("Назва населеного пункту некоректна😢. Введіть іншу назву:")
+        await message.answer("Назва населеного пункту не корректна😢. Введіть іншу назву:")
 
 
 @dp.callback_query_handler(lambda c: c.data == 'back',
@@ -631,21 +632,24 @@ async def process_selected_town(callback_query: CallbackQuery, state: FSMContext
 @dp.message_handler(state='waiting_for_street')
 async def process_street_input(message: types.Message, state: FSMContext):
     selected_street = message.text
+    await state.update_data(selected_street=selected_street)
 
-    async with state.proxy() as data:
-        city_ref = data.get('city_ref')
-
+    city_ref = (await state.get_data()).get('city_ref')
     street_list = get_street_list(city_ref, selected_street)
+
     if street_list:
-        await state.update_data(street_list=street_list)
-        streets_keyboard = generate_streets_keyboard(street_list) 
+        streets_keyboard = generate_streets_keyboard(street_list)
         await bot.send_message(message.chat.id, "🔍Виберіть назву вулиці:", reply_markup=streets_keyboard)
         await state.set_state('waiting_for_selected_street')
+
+
     else:
-        back_button = InlineKeyboardButton('↩️Назад', callback_data='back_to_city_selection')
-        back_keyboard = InlineKeyboardMarkup().add(back_button)
-        await bot.send_message(message.chat.id, "Вулицю не знайдено. Введіть іншу назву вулиці або натисніть 'Назад'.",
-                               reply_markup=back_keyboard)
+        keyboard_back = InlineKeyboardMarkup().add(
+            InlineKeyboardButton('↩️Назад', callback_data='back_to_city_selection'))
+        await bot.send_message(message.chat.id,
+                               "Вулицю не знайдено. Будь ласка, введіть іншу назву вулиці або натисніть кнопку 'Назад'.",
+                               reply_markup=keyboard_back)
+
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street')
@@ -886,7 +890,7 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
     keyboard = InlineKeyboardMarkup()
     keyboard.add(join_button)
     post_message = f"Нова зустріч: {meeting_name} відбудеться у місті {selected_city}, {selected_region} обл. на вулиці {selected_street} {house_number}, {comment}\n Дата: {formatted_date_time} "
-    #await bot.send_message(GROUP_ID, post_message, reply_markup=keyboard)
+    # await bot.send_message(GROUP_ID, post_message, reply_markup=keyboard)
 
     await state.finish()
 
