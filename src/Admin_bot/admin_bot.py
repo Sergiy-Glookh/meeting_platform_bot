@@ -843,7 +843,7 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
     formatted_date_time = date_time.strftime('%Y-%m-%d %H:%M')
 
     user_data = {
-        "_id": meeting_id,
+        "meeting_id": meeting_id,
         "user_id": user_id,
         "city": selected_city,
         "region": f"{selected_region} обл.",

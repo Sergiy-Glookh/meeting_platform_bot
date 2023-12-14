@@ -124,4 +124,8 @@ class Meeting(Document):
     region = StringField(required=True)
     datetime = DateTimeField(required=True)
     participants = ListField()
+    timestamp = DateTimeField()
+    comment = StringField()
+    street = StringField()
+    house_number = StringField()
 
