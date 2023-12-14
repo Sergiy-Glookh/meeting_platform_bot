@@ -20,7 +20,7 @@ waiting_for_description = State()
 current_datetime = datetime.now()
 cancel_requests = {}
 
-
+"""
 @dp.callback_query_handler(lambda c: c.data == 'back',
                            state=['waiting_for_month', 'waiting_for_day', 'waiting_for_hour', 'waiting_for_minute',
                                   'waiting_for_year'])
@@ -54,7 +54,7 @@ async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
     else:
         await state.set_state('waiting_for_selected_town')
         await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
-
+"""
 
 def is_valid_uuid(s):
     try:
@@ -116,7 +116,7 @@ async def view_active_meetings(callback_query: CallbackQuery):
             city = meeting['city']
             region = meeting['region']
             datetime = meeting['datetime']
-            meeting_id = str(meeting['_id'])
+            meeting_id = str(meeting['meeting_id'])
 
             text = f"🥂{meeting_name}\n📅{datetime}\n🌍{city}, {region}"
             keyboard.add(InlineKeyboardButton(text, callback_data=f'view_meeting:{meeting_id}'))
@@ -217,7 +217,7 @@ async def edit_meeting(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     meeting_id = callback_query.data.split(':')[1]
 
-    meeting = Meeting.objects(meeting_id=ObjectId(meeting_id)).first()
+    meeting = Meeting.objects(meeting_id=meeting_id).first()
 
     if meeting:
 
@@ -247,7 +247,7 @@ async def back_to_meetings_menu(callback_query: CallbackQuery):
             city = meeting['city']
             region = meeting['region']
             datetime = meeting['datetime']
-            meeting_id = str(meeting['_id'])
+            meeting_id = str(meeting['meeting_id'])
 
             text = f"🥂{meeting_name}\n📅{datetime}\n🌍{city}, {region}"
             keyboard.add(InlineKeyboardButton(text, callback_data=f'view_meeting:{meeting_id}'))
@@ -638,11 +638,14 @@ async def process_street_input(message: types.Message, state: FSMContext):
     street_list = get_street_list(city_ref, selected_street)
     if street_list:
         await state.update_data(street_list=street_list)
-        streets_keyboard = generate_streets_keyboard(street_list)  # Припустимо, що ви створите цю функцію
+        streets_keyboard = generate_streets_keyboard(street_list) 
         await bot.send_message(message.chat.id, "🔍Виберіть назву вулиці:", reply_markup=streets_keyboard)
         await state.set_state('waiting_for_selected_street')
     else:
-        await bot.send_message(message.chat.id, "Вулиць не знайдено.")
+        back_button = InlineKeyboardButton('↩️Назад', callback_data='back_to_city_selection')
+        back_keyboard = InlineKeyboardMarkup().add(back_button)
+        await bot.send_message(message.chat.id, "Вулицю не знайдено. Введіть іншу назву вулиці або натисніть 'Назад'.",
+                               reply_markup=back_keyboard)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street')
@@ -859,7 +862,8 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
 
     user_name = callback_query.from_user.username or callback_query.from_user.first_name
 
-    Meeting(**user_data)
+    new_meeting = Meeting(**user_data)
+    new_meeting.save()
 
     if formatted_date_time not in meetings_participants:
         meetings_participants[formatted_date_time] = [{"user_id": user_id, "username": user_name}]
@@ -882,7 +886,7 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
     keyboard = InlineKeyboardMarkup()
     keyboard.add(join_button)
     post_message = f"Нова зустріч: {meeting_name} відбудеться у місті {selected_city}, {selected_region} обл. на вулиці {selected_street} {house_number}, {comment}\n Дата: {formatted_date_time} "
-    await bot.send_message(GROUP_ID, post_message, reply_markup=keyboard)
+    #await bot.send_message(GROUP_ID, post_message, reply_markup=keyboard)
 
     await state.finish()
 

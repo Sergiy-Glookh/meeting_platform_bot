@@ -117,7 +117,7 @@ def get_regions_and_cities():
 #TODO:
 class Meeting(Document):
     meeting_id = StringField(primary_key=True)
-    user_id = StringField(required=True)
+    user_id = IntField(required=True)
     meeting_name = StringField(required=True)
     description = StringField()
     city = StringField(required=True)
