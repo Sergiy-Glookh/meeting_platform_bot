@@ -98,15 +98,15 @@ meeting_keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data="ba
 def generate_streets_keyboard(street_list):
     keyboard = InlineKeyboardMarkup(row_width=1)
 
-    streets = street_list.get('data', [])
-    if streets:
-        for street_info in streets[0].get('Addresses', []):
+    if street_list:
+        for street_info in street_list:
             if 'Present' in street_info:
                 street_name = street_info['Present']
                 button = InlineKeyboardButton(street_name, callback_data=f"street_{street_name}")
                 keyboard.add(button)
 
     return keyboard
+
 
 def create_confirmation_keyboard():
     keyboard = InlineKeyboardMarkup()

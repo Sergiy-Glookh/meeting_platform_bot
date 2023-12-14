@@ -20,7 +20,7 @@ waiting_for_description = State()
 current_datetime = datetime.now()
 cancel_requests = {}
 
-"""
+
 @dp.callback_query_handler(lambda c: c.data == 'back',
                            state=['waiting_for_month', 'waiting_for_day', 'waiting_for_hour', 'waiting_for_minute',
                                   'waiting_for_year'])
@@ -54,7 +54,7 @@ async def process_back_button(callback_query: CallbackQuery, state: FSMContext):
     else:
         await state.set_state('waiting_for_selected_town')
         await bot.send_message(callback_query.message.chat.id, '🗺️Введи назву населеного пункту де буде зустріч:')
-"""
+
 
 
 def is_valid_uuid(s):
@@ -268,7 +268,7 @@ async def back_to_meetings_menu(callback_query: CallbackQuery):
     await bot.send_message(user_id, response, reply_markup=keyboard)
 
 
-"""
+
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_name:'))
 async def edit_meeting_name(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
@@ -290,7 +290,7 @@ async def edit_meeting_name(callback_query: CallbackQuery):
             new_meeting_name = message.text
 
 
-            collection.update_one({"_id": ObjectId(meeting_id)}, {"$set": {"meeting_name": new_meeting_name}})
+            meeting.update(set__description=new_description)
 
             keyboard = InlineKeyboardMarkup()
             keyboard.add(InlineKeyboardButton("🖊️ Редагувати назву", callback_data=f'edit_name:{meeting_id}'))
@@ -392,7 +392,7 @@ async def create_back_button():
     keyboard = InlineKeyboardMarkup()
     keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data='back_to_meetings'))
     return keyboard
-"""
+
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('cancel_meeting:'))
@@ -417,15 +417,20 @@ async def cancel_meeting(callback_query: CallbackQuery):
         await bot.send_message(user_id, "Недійсний ідентифікатор зустрічі.")
 
 
-@dp.message_handler(lambda message: message.text and message.text != 'Так' and message.from_user.id in cancel_requests)
+@dp.message_handler(lambda message: message.text and message.from_user.id in cancel_requests)
 async def handle_cancel_reason(message: Message):
     user_id = message.from_user.id
     cancel_reason = message.text
+    meeting_info = cancel_requests[user_id]
+    meeting_id = meeting_info['meeting_id']
+
+    Meeting.objects(meeting_id=meeting_id).delete()
 
     del cancel_requests[user_id]
 
+    await bot.send_message(user_id, f"Зустріч скасовано. Причина: {cancel_reason}")
 
-"""
+
 @dp.callback_query_handler(lambda c: c.data.startswith('cancel_meeting:'))
 async def cancel_meeting(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
@@ -433,15 +438,15 @@ async def cancel_meeting(callback_query: CallbackQuery):
 
     if is_valid_uuid(meeting_id):
 
-        meeting = collection.find_one({"_id": meeting_id})
+        meeting = Meeting.objects({"meeting_id": meeting_id}).first()
 
         if meeting:
             try:
 
                 confirmation_keyboard = create_confirmation_keyboard()
 
-
-                await bot.send_message(user_id, "Ви впевнені, що хочете скасувати зустріч?", reply_markup=confirmation_keyboard)
+                await bot.send_message(user_id, "Ви впевнені, що хочете скасувати зустріч?",
+                                       reply_markup=confirmation_keyboard)
 
                 cancel_requests[user_id] = {
                     'meeting_id': meeting_id,
@@ -454,7 +459,6 @@ async def cancel_meeting(callback_query: CallbackQuery):
             await bot.send_message(user_id, "Зустріч не знайдена.")
     else:
         await bot.send_message(user_id, "Недійсний ідентифікатор зустрічі.")
-"""
 
 
 @dp.callback_query_handler(lambda c: c.data == 'confirm_cancel')
@@ -637,19 +641,19 @@ async def process_street_input(message: types.Message, state: FSMContext):
     city_ref = (await state.get_data()).get('city_ref')
     street_list = get_street_list(city_ref, selected_street)
 
-    if street_list:
+    if street_list.get('success') and street_list['data'][0]['TotalCount'] > 0:
+        street_list = street_list['data'][0]['Addresses']
+        await state.update_data(street_list=street_list)
         streets_keyboard = generate_streets_keyboard(street_list)
         await bot.send_message(message.chat.id, "🔍Виберіть назву вулиці:", reply_markup=streets_keyboard)
         await state.set_state('waiting_for_selected_street')
-
-
     else:
         keyboard_back = InlineKeyboardMarkup().add(
             InlineKeyboardButton('↩️Назад', callback_data='back_to_city_selection'))
         await bot.send_message(message.chat.id,
                                "Вулицю не знайдено. Будь ласка, введіть іншу назву вулиці або натисніть кнопку 'Назад'.",
                                reply_markup=keyboard_back)
-
+        await state.set_state('waiting_for_street')
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street')
@@ -659,11 +663,9 @@ async def process_selected_street(callback_query: CallbackQuery, state: FSMConte
 
     selected_street = callback_query.data
 
-    # Збереження обраної вулиці у стані без префіксу "street_"
     selected_street = selected_street.replace('street_', '')
     await state.update_data(selected_street=selected_street)
 
-    # Запит номеру будинку
     await bot.send_message(callback_query.message.chat.id, "Введіть номер будинку:")
     await state.set_state('waiting_for_house_number')
 
