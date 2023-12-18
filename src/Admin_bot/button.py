@@ -125,6 +125,6 @@ async def show_edit_menu(user_id, meeting_id):
     keyboard.add(InlineKeyboardButton("📝 Редагувати опис", callback_data=f'edit_description:{meeting_id}'))
     keyboard.add(InlineKeyboardButton("📅 Редагувати дату", callback_data=f'edit_date:{meeting_id}'))
     keyboard.add(InlineKeyboardButton("🌍 Редагувати локацію", callback_data=f'edit_location:{meeting_id}'))
-    keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data='back'))
+    keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data='back_to_active_meetings'))
 
     await bot.send_message(user_id, "Оберіть, що ви хочете змінити:", reply_markup=keyboard)
