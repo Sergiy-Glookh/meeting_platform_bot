@@ -6,7 +6,6 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from api import get_info, get_street_list, get_city_ref
-from bson import ObjectId
 from src.db.admin_connect import *
 from src.db.models import Meeting
 from button import *
@@ -21,9 +20,6 @@ user_states = {}
 waiting_for_description = State()
 current_datetime = dt.now()
 cancel_requests = {}
-
-class MeetingEditingStates(StatesGroup):
-    waiting_for_time_input = State()
 
 
 @dp.callback_query_handler(lambda c: c.data == 'back',
@@ -567,6 +563,85 @@ async def select_minute(callback_query: types.CallbackQuery):
         del user_editing_info[user_id]
 
     await show_edit_menu(user_id, meeting_id)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith('edit_location:'))
+async def edit_location(callback_query: CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+    meeting_id = callback_query.data.split(':')[1]
+
+    await state.update_data(editing_meeting_id=meeting_id)
+
+    keyboard = create_keyboard_with_back()
+    await bot.send_message(user_id, "Введіть назву міста для зустрічі:", reply_markup=keyboard)
+
+    await state.set_state('waiting_for_selected_town')
+
+
+@dp.message_handler(state='waiting_for_selected_town')
+async def process_town_input(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    town_name = message.text
+
+    info = get_info(town_name)
+    if info:
+        towns_keyboard = generate_towns_keyboard(info)
+        await bot.send_message(user_id, "Оберіть населений пункт:", reply_markup=towns_keyboard)
+    else:
+        await bot.send_message(user_id, "Місто не знайдено. Спробуйте ще раз.")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith('town_'), state='waiting_for_selected_town')
+async def process_selected_town(callback_query: CallbackQuery, state: FSMContext):
+    selected_town = callback_query.data.split('_')[1]
+    await state.update_data(selected_city=selected_town)
+    await bot.send_message(callback_query.from_user.id, "Введіть назву вулиці:")
+    await state.set_state('waiting_for_street')
+
+
+@dp.message_handler(state='waiting_for_street')
+async def process_street_input(message: types.Message, state: FSMContext):
+    selected_street = message.text
+    city_ref = (await state.get_data()).get('city_ref')
+
+    # Виконайте запит до API для отримання списку вулиць
+    street_list = get_street_list(city_ref, selected_street)
+
+    if street_list.get('success') and street_list['data'][0]['TotalCount'] > 0:
+        streets_keyboard = generate_streets_keyboard(street_list['data'][0]['Addresses'])
+        await bot.send_message(message.chat.id, "Оберіть вулицю:", reply_markup=streets_keyboard)
+        await state.set_state('waiting_for_selected_street')
+    else:
+        await bot.send_message(message.chat.id, "Вулицю не знайдено, спробуйте ще раз.")
+
+@dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street')
+async def process_selected_street(callback_query: CallbackQuery, state: FSMContext):
+    selected_street = callback_query.data.split('_')[1]
+    await state.update_data(selected_street=selected_street)
+
+    await bot.send_message(callback_query.from_user.id, "Введіть номер будинку:")
+    await state.set_state('waiting_for_house_number')
+
+
+# Обробник введення номера будинку
+@dp.message_handler(state='waiting_for_house_number')
+async def process_house_number_input(message: types.Message, state: FSMContext):
+    house_number = message.text
+    await state.update_data(house_number=house_number)
+
+    # Отримуємо всі зібрані дані
+    data = await state.get_data()
+    selected_city = data['selected_city']
+    selected_street = data['selected_street']
+
+    # Оновлюємо дані у базі даних
+    meeting_id = data['meeting_id']
+    new_location = f"{selected_city}, {selected_street}, {house_number}"
+    Meeting.objects(meeting_id=meeting_id).update_one(set__location=new_location)
+
+    # Повідомляємо користувача і повертаємо до меню редагування
+    await bot.send_message(message.chat.id, "Локацію зустрічі оновлено на " + new_location)
+    await show_edit_menu(message.chat.id, meeting_id)
 
 
 async def create_back_button():

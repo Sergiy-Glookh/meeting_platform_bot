@@ -64,8 +64,6 @@ def get_city_ref(town):
         print(f"Помилка під час отримання референсу міста: {str(e)}")
 
 
-
-
 def get_street_list(ref, street_name):
     data = {
         "apiKey": API_KEY,
