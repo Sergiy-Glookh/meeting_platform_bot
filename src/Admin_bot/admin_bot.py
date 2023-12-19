@@ -13,6 +13,24 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBut
 import uuid
 from datetime import datetime as dt
 
+
+class MeetingCreation(StatesGroup):
+    waiting_for_meeting_name = State()
+    waiting_for_description = State()
+    waiting_for_town = State()
+    waiting_for_selected_town = State()
+    waiting_for_street = State()
+    waiting_for_selected_street = State()
+    waiting_for_house_number = State()
+
+class MeetingEditing(StatesGroup):
+    waiting_for_meeting_to_edit = State()
+    waiting_for_street_editing = State()
+    waiting_for_selected_street_editing = State()
+    waiting_for_house_number_editing = State()
+
+
+
 waiting_for_street = State()
 previous_states = {}
 previous_keyboard = None
@@ -243,6 +261,7 @@ async def back_to_list(callback_query: CallbackQuery):
         pass
 
 
+#EDIT
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_meeting:'))
 async def edit_meeting(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
@@ -564,7 +583,7 @@ async def select_minute(callback_query: types.CallbackQuery):
 
     await show_edit_menu(user_id, meeting_id)
 
-
+"""
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_location:'))
 async def edit_location(callback_query: CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
@@ -595,6 +614,8 @@ async def process_town_input(message: types.Message, state: FSMContext):
 async def process_selected_town(callback_query: CallbackQuery, state: FSMContext):
     selected_town = callback_query.data.split('_')[1]
     await state.update_data(selected_city=selected_town)
+    city_ref = get_city_ref(selected_town)
+    await state.update_data(city_ref=city_ref)
     await bot.send_message(callback_query.from_user.id, "Введіть назву вулиці:")
     await state.set_state('waiting_for_street')
 
@@ -604,7 +625,6 @@ async def process_street_input(message: types.Message, state: FSMContext):
     selected_street = message.text
     city_ref = (await state.get_data()).get('city_ref')
 
-    # Виконайте запит до API для отримання списку вулиць
     street_list = get_street_list(city_ref, selected_street)
 
     if street_list.get('success') and street_list['data'][0]['TotalCount'] > 0:
@@ -613,6 +633,7 @@ async def process_street_input(message: types.Message, state: FSMContext):
         await state.set_state('waiting_for_selected_street')
     else:
         await bot.send_message(message.chat.id, "Вулицю не знайдено, спробуйте ще раз.")
+
 
 @dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street')
 async def process_selected_street(callback_query: CallbackQuery, state: FSMContext):
@@ -642,7 +663,7 @@ async def process_house_number_input(message: types.Message, state: FSMContext):
     # Повідомляємо користувача і повертаємо до меню редагування
     await bot.send_message(message.chat.id, "Локацію зустрічі оновлено на " + new_location)
     await show_edit_menu(message.chat.id, meeting_id)
-
+"""
 
 async def create_back_button():
     keyboard = InlineKeyboardMarkup()
