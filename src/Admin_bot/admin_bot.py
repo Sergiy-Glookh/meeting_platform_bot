@@ -1,4 +1,3 @@
-import re
 
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.utils.exceptions import MessageToDeleteNotFound
@@ -23,12 +22,12 @@ class MeetingCreation(StatesGroup):
     waiting_for_selected_street = State()
     waiting_for_house_number = State()
 
+
 class MeetingEditing(StatesGroup):
     waiting_for_meeting_to_edit = State()
     waiting_for_street_editing = State()
     waiting_for_selected_street_editing = State()
     waiting_for_house_number_editing = State()
-
 
 
 waiting_for_street = State()
@@ -149,6 +148,7 @@ async def view_active_meetings(callback_query: CallbackQuery):
 
     if len(keyboard.inline_keyboard) == 0:
         response = "😢Наразі у вас немає активних зустрічей."
+        keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data='back_to_menu'))
     else:
         keyboard.add(InlineKeyboardButton('↩️ Назад', callback_data='back_to_menu'))
 
@@ -583,7 +583,7 @@ async def select_minute(callback_query: types.CallbackQuery):
 
     await show_edit_menu(user_id, meeting_id)
 
-"""
+
 @dp.callback_query_handler(lambda c: c.data.startswith('edit_location:'))
 async def edit_location(callback_query: CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
@@ -644,26 +644,29 @@ async def process_selected_street(callback_query: CallbackQuery, state: FSMConte
     await state.set_state('waiting_for_house_number')
 
 
-# Обробник введення номера будинку
+
 @dp.message_handler(state='waiting_for_house_number')
 async def process_house_number_input(message: types.Message, state: FSMContext):
     house_number = message.text
     await state.update_data(house_number=house_number)
 
-    # Отримуємо всі зібрані дані
     data = await state.get_data()
     selected_city = data['selected_city']
     selected_street = data['selected_street']
 
-    # Оновлюємо дані у базі даних
-    meeting_id = data['meeting_id']
+    meeting_id = data['editing_meeting_id']
     new_location = f"{selected_city}, {selected_street}, {house_number}"
-    Meeting.objects(meeting_id=meeting_id).update_one(set__location=new_location)
+    meeting_obj: Meeting = Meeting.objects(meeting_id=meeting_id).first()
+    meeting_obj.city = selected_city
+    meeting_obj.street = selected_street
+    meeting_obj.house_number = house_number
+    meeting_obj.save()
 
-    # Повідомляємо користувача і повертаємо до меню редагування
     await bot.send_message(message.chat.id, "Локацію зустрічі оновлено на " + new_location)
+    await state.finish()
+
     await show_edit_menu(message.chat.id, meeting_id)
-"""
+
 
 async def create_back_button():
     keyboard = InlineKeyboardMarkup()
