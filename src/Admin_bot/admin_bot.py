@@ -4,10 +4,10 @@ from aiogram.utils.exceptions import MessageToDeleteNotFound
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from api import get_info, get_street_list, get_city_ref
+from .api import get_info, get_street_list, get_city_ref
 from src.db.admin_connect import *
 from src.db.models import Meeting
-from button import *
+from .button import *
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 import uuid
 from datetime import datetime as dt
@@ -1177,7 +1177,11 @@ async def join_meeting(callback_query: types.CallbackQuery):
         await bot.answer_callback_query(callback_query.id, text="Помилка: Не знайдено ідентифікатора зустрічі")
 
 
-if __name__ == "__main__":
+def main():
     from aiogram import executor
 
     executor.start_polling(dp, skip_updates=True)
+
+
+if __name__ == "__main__":
+    main()

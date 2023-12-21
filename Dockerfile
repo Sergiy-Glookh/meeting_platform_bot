@@ -2,8 +2,10 @@ FROM python:3.10-slim-buster
 
 WORKDIR .
 
-COPY . .
+COPY requirements.txt .
 
 RUN pip install -r requirements.txt
 
-CMD ["python", "src/user_bot.py"]
+COPY . .
+
+CMD ["python", "run.py"]
