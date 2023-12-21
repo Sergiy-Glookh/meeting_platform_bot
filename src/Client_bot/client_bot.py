@@ -640,7 +640,9 @@ async def finish_selection_cities(query: types.CallbackQuery):
         await query.message.edit_text(text="Користувача не знайдено в базі даних.")
 
 
-if __name__ == '__main__':
+def main():
     from aiogram import executor
 
     executor.start_polling(dp, skip_updates=True)
+
+
