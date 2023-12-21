@@ -4,7 +4,6 @@ import json
 
 
 class UserState:
-
     def __init__(self):
         self.selected_regions = []
         self.index_page = 0
@@ -43,6 +42,9 @@ class User(Document):
     interests = ListField()
     birthday = DateTimeField()
     date_created = DateTimeField(default=datetime.utcnow())
+    birth_day = IntField()
+    birth_month = IntField()
+    birth_year = IntField()
 
     def json(self):
         user_dict = {
@@ -112,13 +114,18 @@ def get_regions_and_cities():
         print("Regions not found")
     return regions_and_cities
 
-#TODO:
+
 class Meeting(Document):
     meeting_id = StringField(primary_key=True)
-    user_id = StringField(required=True)
+    user_id = IntField(required=True)
     meeting_name = StringField(required=True)
     description = StringField()
     city = StringField(required=True)
     region = StringField(required=True)
     datetime = DateTimeField(required=True)
     participants = ListField()
+    timestamp = DateTimeField()
+    comment = StringField()
+    street = StringField()
+    house_number = StringField()
+

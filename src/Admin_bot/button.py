@@ -1,5 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InlineKeyboardButton
 
+from src.db.admin_connect import bot
+
 
 def create_cancel_button(meeting_id):
     return InlineKeyboardButton("❌ Скасувати скасування", callback_data=f'cancel_cancel:{meeting_id}')
@@ -98,15 +100,15 @@ meeting_keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data="ba
 def generate_streets_keyboard(street_list):
     keyboard = InlineKeyboardMarkup(row_width=1)
 
-    streets = street_list.get('data', [])
-    if streets:
-        for street_info in streets[0].get('Addresses', []):
+    if street_list:
+        for street_info in street_list:
             if 'Present' in street_info:
                 street_name = street_info['Present']
                 button = InlineKeyboardButton(street_name, callback_data=f"street_{street_name}")
                 keyboard.add(button)
 
     return keyboard
+
 
 def create_confirmation_keyboard():
     keyboard = InlineKeyboardMarkup()
@@ -117,3 +119,12 @@ def create_confirmation_keyboard():
     return keyboard
 
 
+async def show_edit_menu(user_id, meeting_id):
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("🖊️ Редагувати назву", callback_data=f'edit_name:{meeting_id}'))
+    keyboard.add(InlineKeyboardButton("📝 Редагувати опис", callback_data=f'edit_description:{meeting_id}'))
+    keyboard.add(InlineKeyboardButton("📅 Редагувати дату", callback_data=f'edit_date:{meeting_id}'))
+    keyboard.add(InlineKeyboardButton("🌍 Редагувати локацію", callback_data=f'edit_location:{meeting_id}'))
+    keyboard.add(InlineKeyboardButton("↩️ Назад", callback_data='back_to_active_meetings'))
+
+    await bot.send_message(user_id, "Оберіть, що ви хочете змінити:", reply_markup=keyboard)

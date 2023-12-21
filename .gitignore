@@ -161,3 +161,8 @@ cython_debug/
 .idea/
 config.py
 fly.toml
+.DS_Store/
+
+.DS_Store
+.DS_Store
+src/.DS_Store
