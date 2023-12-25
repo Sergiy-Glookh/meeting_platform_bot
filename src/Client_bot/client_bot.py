@@ -6,7 +6,7 @@ import requests
 import os
 import threading
 import time
-
+from aiogram.utils.exceptions import CantInitiateConversation, BotBlocked
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ContentType
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram import types
@@ -21,9 +21,11 @@ from g4f.Provider import (
 
 from src.db.models import create_profile, edit_profile, get_regions_and_cities, UserState, City, add_location, User, \
     add_interests
-from src.db.client_connect import recognizer, bot, dp, ALL_REGIONS_AND_CITIES, CATEGORIES, NOVA_POSHTA_API_KEY, CITIES_SEARCH_URL
+from src.db.client_connect import recognizer, bot, dp, ALL_REGIONS_AND_CITIES, CATEGORIES, NOVA_POSHTA_API_KEY, \
+    CITIES_SEARCH_URL
 
 user_states = {}
+
 
 class ProfileStatesGroup(StatesGroup):
     name = State()
@@ -33,13 +35,29 @@ class ProfileStatesGroup(StatesGroup):
     birth_year = State()
 
 
+def register_keyboard():
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("Зареєструватися", callback_data="register"))
+    return keyboard
+
+
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    user_id = message.from_user.id
-    print(message.from_user.username)
-    user_states[user_id] = UserState()
-    await create_profile(message.from_user)
-    await message.reply("Будь ласка, введіть ваше ім'я:")
+    try:
+        user_id = message.from_user.id
+        print(message.from_user.username)
+        user_states[user_id] = UserState()
+        await create_profile(message.from_user)
+        await bot.send_message(chat_id=user_id, text="Натисніть на кнопку для реєстрації",
+                               reply_markup=register_keyboard())
+    except (CantInitiateConversation, BotBlocked):
+        await message.reply("Будь ласка, спочатку напишіть мені у приватні повідомлення.")
+
+
+@dp.callback_query_handler(lambda query: query.data == "register")
+async def register(query: types.CallbackQuery):
+    await query.answer("Початок реєстрації")
+    await query.message.edit_text("Будь ласка, введіть ваше ім'я:")
     await ProfileStatesGroup.name.set()
 
 
@@ -375,7 +393,6 @@ async def load_description(query: types.CallbackQuery):
     await bot.send_message(user_id, f"Оберіть область/області:", reply_markup=keyboard)
 
 
-
 @dp.callback_query_handler(
     lambda query: query.data in ALL_REGIONS_AND_CITIES.keys() or query.data == "back_region")
 async def select_region(query: types.CallbackQuery):
@@ -398,7 +415,6 @@ async def select_region(query: types.CallbackQuery):
             keyboard.add(InlineKeyboardButton(region, callback_data=region))
 
     keyboard.add(InlineKeyboardButton("🔸 Моєї області немає", callback_data="unfounded_city"))
-
 
     if user_state.selected_regions:
         selected_regions = ', '.join(user_state.selected_regions)
