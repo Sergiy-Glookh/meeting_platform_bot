@@ -137,7 +137,7 @@ async def view_active_meetings(callback_query: CallbackQuery):
             region = meeting['region']
             meeting_id = str(meeting['meeting_id'])
 
-            text = f"🥂{meeting_name}\n📅{meeting_datetime}\n🌍{city}, {region}"
+            text = f"🥂{meeting_name}\n 📅 {meeting_datetime}\n🌍 {city}"
             keyboard.add(InlineKeyboardButton(text, callback_data=f'view_meeting:{meeting_id}'))
 
             keyboard.add(
@@ -201,7 +201,7 @@ async def view_meeting_details(callback_query: CallbackQuery):
         response = f"🥂 Назва зустрічі: {meeting_name}\n" \
                    f"📝 Опис: {description}\n" \
                    f"📅 Дата та час: {datetime}\n" \
-                   f"🌍 Локація: {city}, {region}"
+                   f"🌍 Локація: {city}"
 
         keyboard = InlineKeyboardMarkup(row_width=1)
         keyboard.add(InlineKeyboardButton(f"👀 Хто приєднався", callback_data=f'joined_meeting:{meeting_id}'))
@@ -299,7 +299,7 @@ async def back_to_meetings_menu(callback_query: CallbackQuery):
             datetime = meeting['datetime']
             meeting_id = str(meeting['meeting_id'])
 
-            text = f"🥂{meeting_name}\n📅{datetime}\n🌍{city}, {region}"
+            text = f"🥂{meeting_name}\n 📅{datetime}\n 🌍 {city}, {region}"
             keyboard.add(InlineKeyboardButton(text, callback_data=f'view_meeting:{meeting_id}'))
 
             button_row = [
