@@ -594,10 +594,10 @@ async def edit_location(callback_query: CallbackQuery, state: FSMContext):
     keyboard = create_keyboard_with_back()
     await bot.send_message(user_id, "Введіть назву міста для зустрічі:", reply_markup=keyboard)
 
-    await state.set_state('waiting_for_selected_town')
+    await state.set_state('waiting_for_selected_town_edited')
 
 
-@dp.message_handler(state='waiting_for_selected_town')
+@dp.message_handler(state='waiting_for_selected_town_edited')
 async def process_town_input(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     town_name = message.text
@@ -610,17 +610,17 @@ async def process_town_input(message: types.Message, state: FSMContext):
         await bot.send_message(user_id, "Місто не знайдено. Спробуйте ще раз.")
 
 
-@dp.callback_query_handler(lambda c: c.data.startswith('town_'), state='waiting_for_selected_town')
+@dp.callback_query_handler(lambda c: c.data.startswith('town_'), state='waiting_for_selected_town_edited')
 async def process_selected_town(callback_query: CallbackQuery, state: FSMContext):
     selected_town = callback_query.data.split('_')[1]
     await state.update_data(selected_city=selected_town)
     city_ref = get_city_ref(selected_town)
     await state.update_data(city_ref=city_ref)
     await bot.send_message(callback_query.from_user.id, "Введіть назву вулиці:")
-    await state.set_state('waiting_for_street')
+    await state.set_state('waiting_for_street_edited')
 
 
-@dp.message_handler(state='waiting_for_street')
+@dp.message_handler(state='waiting_for_street_edited')
 async def process_street_input(message: types.Message, state: FSMContext):
     selected_street = message.text
     city_ref = (await state.get_data()).get('city_ref')
@@ -630,22 +630,22 @@ async def process_street_input(message: types.Message, state: FSMContext):
     if street_list.get('success') and street_list['data'][0]['TotalCount'] > 0:
         streets_keyboard = generate_streets_keyboard(street_list['data'][0]['Addresses'])
         await bot.send_message(message.chat.id, "Оберіть вулицю:", reply_markup=streets_keyboard)
-        await state.set_state('waiting_for_selected_street')
+        await state.set_state('waiting_for_selected_street_edited')
     else:
         await bot.send_message(message.chat.id, "Вулицю не знайдено, спробуйте ще раз.")
 
 
-@dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street')
+@dp.callback_query_handler(lambda c: c.data.startswith('street_'), state='waiting_for_selected_street_edited')
 async def process_selected_street(callback_query: CallbackQuery, state: FSMContext):
     selected_street = callback_query.data.split('_')[1]
     await state.update_data(selected_street=selected_street)
 
     await bot.send_message(callback_query.from_user.id, "Введіть номер будинку:")
-    await state.set_state('waiting_for_house_number')
+    await state.set_state('waiting_for_house_number_edited')
 
 
 
-@dp.message_handler(state='waiting_for_house_number')
+@dp.message_handler(state='waiting_for_house_number_edited')
 async def process_house_number_input(message: types.Message, state: FSMContext):
     house_number = message.text
     await state.update_data(house_number=house_number)

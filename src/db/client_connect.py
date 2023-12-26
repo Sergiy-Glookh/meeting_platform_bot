@@ -8,7 +8,6 @@ import speech_recognition as sr
 from src.db.models import get_regions_and_cities
 
 config = dotenv_values()  # config = {"USER": "foo", "EMAIL": "foo@example.org"}
-print(config)
 DB = config.get("DB")
 TOKEN_API = config.get("TOKEN_API")
 TOKEN_ADMIN_API = config.get("TOKEN_ADMIN_API")
