@@ -12,7 +12,8 @@ DB = config.get("DB")
 TOKEN_ADMIN_API = config.get("TOKEN_ADMIN_API")
 NOVA_POSHTA_API_KEY = config.get("NOVA_POSHTA_API_KEY")
 CITIES_SEARCH_URL = config.get("CITIES_SEARCH_URL")
-GROUP_ID = config.get('BOT', 'GROUP_ID')
+GROUP_ID = config.get('GROUP_ID')
+print(GROUP_ID)
 
 connect(db='meeting-bot', host=DB)
 
@@ -35,20 +36,3 @@ CATEGORIES = [
     'Бізнес та Підприємництво'
 ]
 
-
-
-"""
-mongo_user = config.get('DB', 'admin')
-mongodb_pass = config.get('DB', 'password')
-mong_domain = config.get('DB', 'domain')
-
-client = pymongo.MongoClient(
-    f"mongodb+srv://{mongo_user}:{mongodb_pass}@cluster0.{mong_domain}.mongodb.net/?retryWrites=true&w=majority",  tlsCAFile=ca)
-
-my_db = client['meeting-bot']
-collection = my_db['admin_collection']
-joined = my_db['joined']
-canceled_meetings = my_db['canceled_meetings']
-TOKEN = config.get('BOT', 'token')
-GROUP_ID = config.get('BOT', 'grop_id')
-"""

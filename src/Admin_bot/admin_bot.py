@@ -83,7 +83,7 @@ def is_valid_uuid(s):
 
 @dp.message_handler(commands=['start'])
 async def start_def(message: types.Message):
-    await message.answer('Привіт, що хочеш зробити?🤔', reply_markup=kb_client)
+    await bot.send_message(chat_id=message.from_user.id, text='Привіт, що хочеш зробити?🤔', reply_markup=kb_client)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('view_meeting:'))
@@ -1120,7 +1120,9 @@ async def create_meeting(callback_query: CallbackQuery, state: FSMContext, selec
     keyboard = InlineKeyboardMarkup()
     keyboard.add(join_button)
     post_message = f"Нова зустріч: {meeting_name} відбудеться у місті {selected_city}, {selected_region} обл. на вулиці {selected_street} {house_number}, {comment}\n Дата: {formatted_date_time} "
-    # await bot.send_message(GROUP_ID, post_message, reply_markup=keyboard)
+    print(GROUP_ID)
+
+    await bot.send_message(GROUP_ID, post_message, reply_markup=keyboard)
 
     await state.finish()
 
