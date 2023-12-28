@@ -67,9 +67,6 @@ minute_buttons = [InlineKeyboardButton(str(minute), callback_data=f"select_minut
 minute_buttons.append(create_back_button())
 minute_keyboard = InlineKeyboardMarkup().add(*minute_buttons)
 
-
-
-
 # Додавання кнопки "Назад" до головного меню
 kb_client_with_back = InlineKeyboardMarkup()
 kb_client_with_back.add(create_back_button())
