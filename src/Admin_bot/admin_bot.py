@@ -1,4 +1,3 @@
-
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.utils.exceptions import MessageToDeleteNotFound
 from aiogram.dispatcher.filters.state import State, StatesGroup
@@ -209,40 +208,6 @@ async def view_meeting_details(callback_query: CallbackQuery):
         await bot.send_message(user_id, response, reply_markup=keyboard)
     else:
         await bot.send_message(user_id, "Зустріч не знайдена.")
-
-
-@dp.callback_query_handler(lambda c: c.data.startswith('joined_meeting:'))
-async def show_joined_users(callback_query: CallbackQuery):
-    meeting_id = callback_query.data.split(':')[1]
-
-    meeting = Meeting.objects(meeting_id=meeting_id).first()
-
-    keyboard = None
-
-    if meeting and 'participants' in meeting:
-        participants = meeting['participants']
-        if participants:
-            buttons = []
-
-            for participant in participants:
-                username = participant.get('username', 'No username')
-                button = InlineKeyboardButton(username, url=f"https://t.me/{username}")
-                buttons.append([button])
-
-            keyboard = InlineKeyboardMarkup(row_width=1, inline_keyboard=buttons)
-            keyboard.add(InlineKeyboardButton("Назад", callback_data="back_to_list"))
-
-            response = "Список учасників зустрічі:"
-        else:
-            response = "До цієї зустрічі ще ніхто не приєднався."
-            keyboard = InlineKeyboardMarkup()
-            keyboard.add(InlineKeyboardButton("Назад", callback_data="back_to_list"))
-    else:
-        response = "Інформація про учасників не доступна для цієї зустрічі."
-
-    message = await bot.send_message(callback_query.from_user.id, response, reply_markup=keyboard)
-
-    await dp.current_state().update_data(prev_message_id=message.message_id)
 
 
 @dp.callback_query_handler(lambda c: c.data == 'back_to_list')
@@ -1177,11 +1142,42 @@ async def join_meeting(callback_query: types.CallbackQuery):
         await bot.answer_callback_query(callback_query.id, text="Помилка: Не знайдено ідентифікатора зустрічі")
 
 
+@dp.callback_query_handler(lambda c: c.data.startswith('joined_meeting:'))
+async def show_joined_users(callback_query: CallbackQuery):
+    meeting_id = callback_query.data.split(':')[1]
+
+    meeting = Meeting.objects(meeting_id=meeting_id).first()
+
+    keyboard = None
+
+    if meeting and 'participants' in meeting:
+        participants = meeting['participants']
+        if participants:
+            buttons = []
+
+            for participant in participants:
+                username = participant.get('username', 'No username')
+                button = InlineKeyboardButton(username, url=f"https://t.me/{username}")
+                buttons.append([button])
+
+            keyboard = InlineKeyboardMarkup(row_width=1, inline_keyboard=buttons)
+            keyboard.add(InlineKeyboardButton("Назад", callback_data="back_to_list"))
+
+            response = "Список учасників зустрічі:"
+        else:
+            response = "До цієї зустрічі ще ніхто не приєднався."
+            keyboard = InlineKeyboardMarkup()
+            keyboard.add(InlineKeyboardButton("Назад", callback_data="back_to_list"))
+    else:
+        response = "Інформація про учасників не доступна для цієї зустрічі."
+
+    message = await bot.send_message(callback_query.from_user.id, response, reply_markup=keyboard)
+
+    await dp.current_state().update_data(prev_message_id=message.message_id)
+
+
 def main():
     from aiogram import executor
 
     executor.start_polling(dp, skip_updates=True)
 
-
-if __name__ == "__main__":
-    main()
